@@ -17,14 +17,6 @@ def save(filepath):
 
 
 def open(filepath):
-    if nuke.Root().modified():
-        result = self.save_changes_prompt()
-
-        if result is None:
-            return False
-        if result:
-            nuke.scriptSave()
-
     # To remain in the same window, we have to clear the script and read
     # in the contents of the workfile.
     nuke.scriptClear()
