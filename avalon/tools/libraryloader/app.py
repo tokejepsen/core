@@ -222,20 +222,8 @@ class Window(QtWidgets.QDialog):
         self._refresh()
         self._assetschanged()
 
-        title = "{} - {}"
-        if self.dbcon.active_project() is None:
-            title = title.format(
-                self.tool_title,
-                "No project selected"
-            )
-        else:
-            title = title.format(
-                self.tool_title,
-                os.path.sep.join([
-                    lib.registered_root(self.dbcon),
-                    self.dbcon.active_project()
-                ])
-            )
+        project_name = self.dbcon.active_project() or "No project selected"
+        title = "{} - {}".format(self.tool_title, project_name)
         self.setWindowTitle(title)
 
     def get_default_project(self):
