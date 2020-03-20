@@ -763,10 +763,15 @@ def register_root(path):
 
 def registered_root():
     """Return currently registered root"""
-    return (
-        _registered_root["_"] or
-        os.path.normpath(Session.get("AVALON_PROJECTS")) or ""
-    )
+    root = _registered_root["_"]
+    if root:
+        return root
+
+    root = Session.get("AVALON_PROJECTS")
+    if root:
+        return os.path.normpath(root)
+
+    return ""
 
 
 def register_host(host):
