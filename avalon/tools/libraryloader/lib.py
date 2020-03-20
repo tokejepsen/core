@@ -1,4 +1,3 @@
-import os
 import importlib
 import logging
 from bson.objectid import ObjectId
@@ -9,6 +8,7 @@ from ...pipeline import (
     _make_backwards_compatible_loader,
     IncompatibleLoaderError
 )
+from pypeapp import Roots
 
 FAMILY_ICON_COLOR = "#0091B2"
 FAMILY_CONFIG_CACHE = {}
@@ -296,6 +296,4 @@ def load(
 
 
 def registered_root(dbcon):
-    return os.path.normpath(
-        dbcon.Session.get("AVALON_PROJECTS") or ""
-    )
+    return Roots(dbcon.Session.get("AVALON_PROJECT")).roots
