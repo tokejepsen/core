@@ -32,7 +32,7 @@ from . import (
 )
 
 from .vendor import six, acre
-
+from pypeapp import Anatomy
 
 self = sys.modules[__name__]
 self._is_installed = False
@@ -354,9 +354,9 @@ class Application(Action):
 
         # Compute work directory
         project = io.find_one({"type": "project"})
-        template = project["config"]["template"]["work"]
-        workdir = _format_work_template(template, session)
-        session["AVALON_WORKDIR"] = os.path.normpath(workdir)
+        anatomy = Anatomy(project["name"])
+        anatomy_filled = anatomy.format(session)
+        session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
 
         # dynamic environmnets
         tools_attr = []
@@ -1109,12 +1109,12 @@ def compute_session_changes(session, task=None, asset=None, app=None):
         changes['AVALON_HIERARCHY'] = hierarchy
 
     # Compute work directory (with the temporary changed session so far)
-    project = io.find_one({"type": "project"},
-                          projection={"config.template.work": True})
-    template = project["config"]["template"]["work"]
+    project = io.find_one({"type": "project"})
     _session = session.copy()
     _session.update(changes)
-    changes["AVALON_WORKDIR"] = _format_work_template(template, _session)
+    anatomy = Anatomy(project["name"])
+    anatomy_filled = anatomy.format(_session)
+    changes["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
 
     return changes
 
@@ -1148,44 +1148,6 @@ def update_current_task(task=None, asset=None, app=None):
     emit("taskChanged", changes.copy())
 
     return changes
-
-
-def _format_work_template(template, session=None):
-    """Return a formatted configuration template with a Session.
-
-    Note: This *cannot* format the templates for published files since the
-        session does not hold the context for a published file. Instead use
-        `get_representation_path` to parse the full path to a published file.
-
-    Args:
-        template (str): The template to format.
-        session (dict, Optional): The Session to use. If not provided use the
-            currently active global Session.
-
-    Returns:
-        str: The fully formatted path.
-
-    """
-    if session is None:
-        session = Session
-
-    project = io.find_one({'type': 'project'})
-
-    return template.format(**{
-        "root": registered_root(),
-        "project": {
-            "name": project.get("name", session["AVALON_PROJECT"]),
-            "code": project["data"].get("code", ''),
-        },
-        "asset": session["AVALON_ASSET"],
-        "task": session["AVALON_TASK"],
-        "app": session["AVALON_APP"],
-
-        # Optional
-        "silo": session.get("AVALON_SILO"),
-        "user": session.get("AVALON_USER", getpass.getuser()),
-        "hierarchy": session.get("AVALON_HIERARCHY"),
-    })
 
 
 def _make_backwards_compatible_loader(Loader):
@@ -1387,7 +1349,7 @@ def format_template_with_optional_keys(data, template):
     return work_file
 
 
-def get_representation_path(representation):
+def get_representation_path(representation, root=None, dbcon=None):
     """Get filename from representation document
 
     There are three ways of getting the path from representation which are
@@ -1404,29 +1366,37 @@ def get_representation_path(representation):
         str: fullpath of the representation
 
     """
+    if dbcon is None:
+        dbcon = io
+
+    if root is None:
+        root = registered_root()
 
     def path_from_represenation():
         try:
             template = representation["data"]["template"]
-
         except KeyError:
             return None
 
         try:
             context = representation["context"]
-            context["root"] = registered_root()
+            context["root"] = root
             path = format_template_with_optional_keys(context, template)
-
         except KeyError:
             # Template references unavailable data
             return None
 
-        if os.path.exists(path):
-            return os.path.normpath(path)
+        if not path:
+            return path
+
+        normalized_path = os.path.normpath(path)
+        if os.path.exists(normalized_path):
+            return normalized_path
+        return path
 
     def path_from_config():
         try:
-            version_, subset, asset, project = io.parenthood(representation)
+            version_, subset, asset, project = dbcon.parenthood(representation)
         except ValueError:
             log.debug(
                 "Representation %s wasn't found in database, "
@@ -1453,7 +1423,7 @@ def get_representation_path(representation):
 
         # Cannot fail, required members only
         data = {
-            "root": registered_root(),
+            "root": root,
             "project": {
                 "name": project["name"],
                 "code": project.get("data", {}).get("code")
@@ -1465,9 +1435,9 @@ def get_representation_path(representation):
             "version": version_["name"],
             "representation": representation["name"],
             "family": representation.get("context", {}).get("family"),
-            "user": Session.get("AVALON_USER", getpass.getuser()),
-            "app": Session.get("AVALON_APP", ""),
-            "task": Session.get("AVALON_TASK", "")
+            "user": dbcon.Session.get("AVALON_USER", getpass.getuser()),
+            "app": dbcon.Session.get("AVALON_APP", ""),
+            "task": dbcon.Session.get("AVALON_TASK", "")
         }
 
         try:
@@ -1476,8 +1446,10 @@ def get_representation_path(representation):
             log.debug("Template references unavailable data: %s" % e)
             return None
 
-        if os.path.exists(path):
-            return os.path.normpath(path)
+        normalized_path = os.path.normpath(path)
+        if os.path.exists(normalized_path):
+            return normalized_path
+        return path
 
     def path_from_data():
         if "path" not in representation["data"]:
