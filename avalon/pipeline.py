@@ -1350,10 +1350,7 @@ def format_template_with_optional_keys(data, template):
     work_file = template.format(**data)
 
     # Remove optional symbols
-    work_file = work_file.replace("<", "")
-    work_file = work_file.replace(">", "")
-
-    return work_file
+    return work_file.replace("<", "").replace(">", "").replace("..", ".")
 
 
 def get_representation_path(representation, root=None, dbcon=None):
