@@ -1,5 +1,11 @@
+from ...vendor import Qt
 from ...vendor.Qt import QtWidgets, QtGui, QtCore
 from ..models import AssetModel
+
+if Qt.__binding__ == "PySide":
+    from PySide.QtGui import QStyleOptionViewItemV4
+elif Qt.__binding__ == "PyQt4":
+    from PyQt4.QtGui import QStyleOptionViewItemV4
 
 
 class AssetDelegate(QtWidgets.QItemDelegate):
@@ -13,6 +19,10 @@ class AssetDelegate(QtWidgets.QItemDelegate):
         return result
 
     def paint(self, painter, option, index):
+        # Qt4 compat
+        if Qt.__binding__ in ("PySide", "PyQt4"):
+            option = QStyleOptionViewItemV4(option)
+
         painter.save()
 
         item_rect = QtCore.QRect(option.rect)
@@ -21,7 +31,7 @@ class AssetDelegate(QtWidgets.QItemDelegate):
         subset_colors = index.data(AssetModel.subsetColorsRole)
         subset_colors_width = 0
         if subset_colors:
-            subset_colors_width = option.rect.width()/len(subset_colors)
+            subset_colors_width = option.rect.width() / len(subset_colors)
 
         subset_rects = []
         counter = 0
@@ -33,7 +43,9 @@ class AssetDelegate(QtWidgets.QItemDelegate):
 
                 new_rect = QtCore.QRect(
                     option.rect.left() + (counter * subset_colors_width),
-                    option.rect.top() + (option.rect.height()-self.bar_height),
+                    option.rect.top() + (
+                        option.rect.height() - self.bar_height
+                    ),
                     subset_colors_width,
                     self.bar_height
                 )

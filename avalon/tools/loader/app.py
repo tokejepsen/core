@@ -267,7 +267,7 @@ class Window(QtWidgets.QDialog):
         # Active must be in the selected rows otherwise we
         # assume it's not actually an "active" current index.
         version_docs = None
-        version_id = None
+        version_doc = None
         active = selection.currentIndex()
         rows = selection.selectedRows(column=active.column())
         if active:
@@ -277,7 +277,7 @@ class Window(QtWidgets.QDialog):
                     item is not None and
                     not (item.get("isGroup") or item.get("isMerged"))
                 ):
-                    version_id = item["version_document"]["_id"]
+                    version_doc = item["version_document"]
 
         if rows:
             version_docs = []
@@ -293,7 +293,7 @@ class Window(QtWidgets.QDialog):
                     continue
                 version_docs.append(item["version_document"])
 
-        self.data["model"]["version"].set_version(version_id)
+        self.data["model"]["version"].set_version(version_doc)
 
         thumbnail_docs = version_docs
         if not thumbnail_docs:
