@@ -295,5 +295,13 @@ def load(
     return loader.load(context, name, namespace, options)
 
 
-def registered_root(dbcon):
-    return Roots(dbcon.Session.get("AVALON_PROJECT")).roots
+class RegisteredRoots:
+    roots_per_project = {}
+
+    @classmethod
+    def registered_root(cls, dbcon):
+        project_name = dbcon.Session.get("AVALON_PROJECT")
+        if project_name not in cls.roots_per_project:
+            cls.roots_per_project[project_name] = Roots(project_name).roots
+
+        return cls.roots_per_project[project_name]
