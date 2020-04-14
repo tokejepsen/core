@@ -150,6 +150,17 @@ class NameWindow(QtWidgets.QDialog):
         if not data["comment"]:
             data.pop("comment", None)
 
+        # Define saving file extension
+        current_file = self.host.current_file()
+        if current_file:
+            # Match the extension of current file
+            _, extension = os.path.splitext(current_file)
+        else:
+            # Fall back to the first extension supported for this host.
+            extension = self.host.file_extensions()[0]
+
+        data["ext"] = extension
+
         # Remove optional missing keys
         pattern = re.compile(r"<.*?>")
         invalid_optionals = []
@@ -164,20 +175,19 @@ class NameWindow(QtWidgets.QDialog):
 
         work_file = template.format(**data)
 
+        if not work_file.endswith(extension):
+            if not extension.startswith("."):
+                extension = "." + extension
+
+            work_file += extension
+
         # Remove optional symbols
-        work_file = work_file.replace("<", "")
-        work_file = work_file.replace(">", "")
-
-        # Define saving file extension
-        current_file = self.host.current_file()
-        if current_file:
-            # Match the extension of current file
-            _, extension = os.path.splitext(current_file)
-        else:
-            # Fall back to the first extension supported for this host.
-            extension = self.host.file_extensions()[0]
-
-        work_file = work_file + extension
+        work_file = (
+            work_file
+            .replace("<", "")
+            .replace(">", "")
+            .replace("..", ".")
+        )
 
         return work_file
 
