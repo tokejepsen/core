@@ -355,7 +355,8 @@ class Application(Action):
         # Compute work directory
         project = io.find_one({"type": "project"})
         anatomy = Anatomy(project["name"])
-        anatomy_filled = anatomy.format(session)
+        template_data = template_data_from_session(session)
+        anatomy_filled = anatomy.format(template_data)
         session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
 
         # dynamic environmnets
@@ -1044,6 +1045,40 @@ def get_representation_context(representation):
     return context
 
 
+def template_data_from_session(session):
+    """ Return dictionary with template from session keys.
+
+    Args:
+        session (dict, Optional): The Session to use. If not provided use the
+            currently active global Session.
+    Returns:
+        dict: All available data from session.
+    """
+    if session is None:
+        session = Session
+
+    project_name = session["AVALON_PROJECT"]
+    project = io._database[project_name].find_one(
+        {"type": "project"}
+    )
+
+    return {
+        "root": registered_root(),
+        "project": {
+            "name": project.get("name", session["AVALON_PROJECT"]),
+            "code": project["data"].get("code", ""),
+        },
+        "asset": session["AVALON_ASSET"],
+        "task": session["AVALON_TASK"],
+        "app": session["AVALON_APP"],
+
+        # Optional
+        "silo": session.get("AVALON_SILO"),
+        "user": session.get("AVALON_USER", getpass.getuser()),
+        "hierarchy": session.get("AVALON_HIERARCHY"),
+    }
+
+
 def compute_session_changes(session, task=None, asset=None, app=None):
     """Compute the changes for a Session object on asset, task or app switch
 
@@ -1113,7 +1148,8 @@ def compute_session_changes(session, task=None, asset=None, app=None):
     _session = session.copy()
     _session.update(changes)
     anatomy = Anatomy(project["name"])
-    anatomy_filled = anatomy.format(_session)
+    template_data = template_data_from_session(_session)
+    anatomy_filled = anatomy.format(template_data)
     changes["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
 
     return changes
