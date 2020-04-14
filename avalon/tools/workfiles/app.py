@@ -19,6 +19,8 @@ from .view import FilesView
 
 log = logging.getLogger(__name__)
 
+from pypeapp import Anatomy
+
 module = sys.modules[__name__]
 module.window = None
 
@@ -61,12 +63,8 @@ class NameWindow(QtWidgets.QDialog):
         }
 
         # Define work files template
-        templates = project["config"]["template"]
-        template = templates.get(
-            "workfile",
-            "{task[name]}_v{version:0>4}<_{comment}>"
-        )
-        self.template = template
+        anatomy = Anatomy(project["name"])
+        self.template = anatomy.templates["work"]["file"]
 
         self.widgets = {
             "preview": QtWidgets.QLabel("Preview filename"),
