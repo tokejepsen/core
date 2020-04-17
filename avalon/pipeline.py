@@ -1386,7 +1386,13 @@ def format_template_with_optional_keys(data, template):
     work_file = template.format(**data)
 
     # Remove optional symbols
-    return work_file.replace("<", "").replace(">", "").replace("..", ".")
+    work_file.replace("<", "")
+    work_file.replace(">", "")
+
+    # Remove double dots when dot for extension is in template
+    work_file.replace("..", ".")
+
+    return work_file
 
 
 def get_representation_path(representation, root=None, dbcon=None):
