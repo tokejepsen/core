@@ -47,7 +47,7 @@ def reload_pipeline():
     api.install(avalon.premiere)
 
 
-def install(config):
+def install():
     """Install Premiere-specific functionality of avalon-core.
 
     This is where you install menus and register families, data
@@ -60,28 +60,11 @@ def install(config):
     """
 
     pyblish.register_host("premiere")
-    # Trigger install on the config's "premiere" package
-    config = find_host_config(config)
-
-    if hasattr(config, "install"):
-        config.install()
 
     log.info("config.premiere installed")
 
 
-def find_host_config(config):
-    try:
-        config = importlib.import_module(config.__name__ + ".premiere")
-    except ImportError as exc:
-        if str(exc) != "No module name {}".format(
-                config.__name__ + ".premiere"):
-            raise
-        config = None
-
-    return config
-
-
-def uninstall(config):
+def uninstall():
     """Uninstall all tha was installed
 
     This is where you undo everything that was done in `install()`.
@@ -92,8 +75,5 @@ def uninstall(config):
     modifying the menu or registered families.
 
     """
-    config = find_host_config(config)
-    if hasattr(config, "uninstall"):
-        config.uninstall()
 
     pyblish.deregister_host("premiere")
