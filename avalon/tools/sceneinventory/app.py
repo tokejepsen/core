@@ -600,7 +600,7 @@ class SearchComboBox(QtWidgets.QComboBox):
         if text not in lookup:
             return None
 
-        return text
+        return text or None
 
 
 class SwitchAssetDialog(QtWidgets.QDialog):
@@ -1002,10 +1002,10 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._repre_label.setText(repre_label)
 
     def validate(self):
-        _asset_name = self._assets_box.get_valid_value() or None
-        _subset_name = self._subsets_box.get_valid_value() or None
-        _lod_name = self._lods_box.get_valid_value() or None
-        _repre_name = self._representations_box.get_valid_value() or None
+        _asset_name = self._assets_box.get_valid_value()
+        _subset_name = self._subsets_box.get_valid_value()
+        _lod_name = self._lods_box.get_valid_value()
+        _repre_name = self._representations_box.get_valid_value()
 
         asset_ok = True
         subset_ok = True
@@ -1258,7 +1258,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         for subset in self.content_subsets.values():
             subsets_by_parent_id[subset["parent"]].append(subset)
 
-        possible_subsets = set()
+        possible_subsets = None
         for subsets in subsets_by_parent_id.values():
             asset_subsets = set()
             for subset in subsets:
@@ -1270,11 +1270,13 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     )
                 asset_subsets.add(subset_name)
 
-            if not possible_subsets:
+            if possible_subsets is None:
                 possible_subsets = asset_subsets
             else:
                 possible_subsets = (possible_subsets & asset_subsets)
 
+        if possible_subsets is None:
+            return list()
         return list(possible_subsets)
 
     def _group_lods(self, subsets):
@@ -1330,25 +1332,30 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             and not selected_subset
             and (self.is_lod is False or not selected_lod)
         ):
-            output_repres = set()
-            for item in self._items:
-                _id = io.ObjectId(item["representation"])
-                representation = io.find_one({
-                    "type": "representation",
-                    "_id": _id
-                })
-                repres = io.find({
-                    "type": "representation",
-                    "parent": representation["parent"]
-                })
+            context_version_ids = [
+                version["_id"] for version in self.content_versions.values()
+            ]
+            possible_repres = list(io.find({
+                "type": "representation",
+                "parent": {"$in": context_version_ids}
+            }))
+            possible_repres_by_parent = collections.defaultdict(list)
+            for repre in possible_repres:
+                possible_repres_by_parent[repre["parent"]].append(repre)
+
+            output_repres = None
+            for repres in possible_repres_by_parent.values():
                 merge_repres = set()
                 for repre in repres:
                     merge_repres.add(repre["name"])
-                if output_repres:
-                    output_repres = (output_repres & merge_repres)
-                else:
+                if output_repres is None:
                     output_repres = merge_repres
-            return list(output_repres)
+                else:
+                    output_repres = (output_repres & merge_repres)
+
+            if output_repres is not None:
+                return list(output_repres)
+            return list()
 
         # If everything is selected
         if (
@@ -1453,17 +1460,20 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 repre_per_version[repre["parent"]].add(repre["name"])
 
             # representations
-            output_repres = set()
+            output_repres = None
             for repre_names in repre_per_version.values():
-                if not output_repres:
+                if output_repres is None:
                     output_repres = repre_names
                 else:
                     output_repres = (output_repres & repre_names)
 
+            if output_repres is None:
+                return list()
             return list(output_repres)
 
         # if asset is not selected and lod is selected
         elif self.is_lod and selected_lod:
+            # TODO effective way
             output_repres = set()
             for item in self._items:
                 _id = io.ObjectId(item["representation"])
@@ -1561,13 +1571,15 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         for repre in latest_representations:
             repres_by_parent[repre["parent"]].add(repre["name"])
 
-        output_repres = set()
+        output_repres = None
         for repre_names in repres_by_parent.values():
-            if not output_repres:
+            if output_repres is None:
                 output_repres = repre_names
             else:
                 output_repres = (output_repres & repre_names)
 
+        if output_repres is None:
+            return list()
         return list(output_repres)
 
     def _get_document_names(self, document_type, parents=[]):
@@ -1580,10 +1592,10 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
     def _on_accept(self):
         # Use None when not a valid value or when placeholder value
-        _asset = self._assets_box.get_valid_value() or None
-        _subset = self._subsets_box.get_valid_value() or None
-        _lod = self._lods_box.get_valid_value() or None
-        _representation = self._representations_box.get_valid_value() or None
+        _asset = self._assets_box.get_valid_value()
+        _subset = self._subsets_box.get_valid_value()
+        _lod = self._lods_box.get_valid_value()
+        _representation = self._representations_box.get_valid_value()
 
         if self.is_lod:
             if not any([_asset, _subset, _lod, _representation]):
@@ -1596,13 +1608,11 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 _lod_name = _lod
                 _representation_name = _representation
 
-                _id = io.ObjectId(item["representation"])
-                representation = io.find_one({
-                    "type": "representation",
-                    "_id": _id
-                })
-                version, subset, asset, project = io.parenthood(representation)
-
+                repre = self.content_repres[
+                    io.ObjectId(item["representation"])
+                ]
+                version = self.content_versions[repre["parent"]]
+                subset = self.content_subsets[version["parent"]]
                 if _subset_name is not None and _lod_name is not None:
                     _subset_name = self.LOD_SPLITTER.join([
                         _subset_name.replace(self.LOD_MARK, ""),
@@ -1634,8 +1644,14 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                         subset_name=_subset_name,
                         representation_name=_representation_name
                     )
-                except Exception as e:
-                    self.log.warning(e)
+                except Exception:
+                    self.log.warning(
+                        (
+                            "Couldn't switch asset."
+                            "See traceback for more information."
+                        ),
+                        exc_info=True
+                    )
         else:
             if not any([_asset, _subset, _representation]):
                 self.log.error("Nothing selected")
@@ -1646,12 +1662,10 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 _subset_name = _subset
                 _representation_name = _representation
 
-                _id = io.ObjectId(item["representation"])
-                representation = io.find_one({
-                    "type": "representation",
-                    "_id": _id
-                })
-                version, subset, asset, project = io.parenthood(representation)
+                repre = self.content_repres[
+                    io.ObjectId(item["representation"])
+                ]
+                subset = self.content_subsets[repre["parent"]]
                 if _subset_name is not None and _asset_name is None:
                     lod_regex_result = re.search(
                         self.LOD_REGEX, subset["name"]
@@ -1667,8 +1681,14 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                         subset_name=_subset_name,
                         representation_name=_representation_name
                     )
-                except Exception as e:
-                    self.log.warning(e)
+                except Exception:
+                    self.log.warning(
+                        (
+                            "Couldn't switch asset."
+                            "See traceback for more information."
+                        ),
+                        exc_info=True
+                    )
 
         self.switched.emit()
 
