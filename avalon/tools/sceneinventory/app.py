@@ -858,22 +858,20 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         subset_text = self._subsets_box.currentText()
         last_lod = self._lods_box.currentText()
 
-        if subset_text != "":
+        if subset_text:
             is_lod = self.LOD_MARK in subset_text
             # self.is_lod = is_lod
             self._lods_box.setVisible(is_lod)
             self._lod_label.setVisible(is_lod)
             if not is_lod:
-                lods = []
-                lods.append(self.LOD_NOT_LOD)
                 self.fill_check = False
-                self._lods_box.populate(list(lods))
+                self._lods_box.populate([self.LOD_NOT_LOD])
                 self._lods_box.setCurrentIndex(0)
                 self.fill_check = True
                 return
 
-        lods = set()
-        if asset_text != "" and subset_text != "":
+        lods = None
+        if asset_text and subset_text:
             subset_part = subset_text.replace(self.LOD_MARK, "")
             asset = io.find_one({
                 "type": "asset",
@@ -883,6 +881,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 "type": "subset",
                 "parent": asset["_id"]
             })
+
+            lods = set()
             for subset in subsets:
                 if not subset["name"].startswith(subset_part):
                     continue
@@ -895,7 +895,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     lod = self.LOD_NOT_LOD
                 lods.add(lod)
 
-        elif asset_text != "":
+        elif asset_text:
             asset = io.find_one({
                 "type": "asset",
                 "name": asset_text
@@ -916,40 +916,36 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             self._lods_box.setVisible(is_lod)
             self._lod_label.setVisible(is_lod)
             if not is_lod:
-                lods = []
-                lods.append(self.LOD_NOT_LOD)
                 self.fill_check = False
-                self._lods_box.populate(lods)
+                self._lods_box.populate([self.LOD_NOT_LOD])
                 self._lods_box.setCurrentIndex(0)
                 self.fill_check = True
                 return
+
             for _lods in groups.values():
-                sub_lods = set()
-                for lod in _lods:
-                    sub_lods.add(lod)
-                if lods:
-                    lods = (lods & sub_lods)
-                else:
+                sub_lods = set(lod for lod in _lods)
+                if lods is None:
                     lods = sub_lods
+                else:
+                    lods = (lods & sub_lods)
 
         else:
             subset_part = subset_text.replace(self.LOD_MARK, "")
-            # TODO effective way
-            for item in self._items:
+
+            asset_ids = [asset["_id"] for asset in self.content_assets]
+            subsets_of_context_assets = io.find({
+                "type": "subset",
+                "parent": {"$in": asset_ids}
+            })
+
+            subsets_by_parent_id = collections.defaultdict(list)
+            for subset in subsets_of_context_assets:
+                if subset["name"].startswith(subset_part):
+                    subsets_by_parent_id[subset["parent"]].append(subset)
+
+            for subsets in subsets_by_parent_id.values():
                 item_lods = set()
-                _id = io.ObjectId(item["representation"])
-                representation = io.find_one({
-                    "type": "representation",
-                    "_id": _id
-                })
-                version, subset, asset, project = io.parenthood(representation)
-                subsets = io.find({
-                    "type": "subset",
-                    "parent": asset["_id"]
-                })
                 for subset in subsets:
-                    if not subset["name"].startswith(subset_part):
-                        continue
                     lod_regex_result = re.search(
                         self.LOD_REGEX, subset["name"]
                     )
@@ -960,12 +956,16 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     else:
                         lod = self.LOD_NOT_LOD
                     item_lods.add(lod)
-                if lods:
-                    lods = (lods & item_lods)
-                else:
-                    lods = item_lods
 
-        lods = sorted(list(lods))
+                if lods is None:
+                    lods = item_lods
+                else:
+                    lods = (lods & item_lods)
+
+        if lods is None:
+            lods = list()
+        else:
+            lods = sorted(list(lods))
         self.fill_check = False
         # fill lods into combobox
         self._lods_box.populate(lods)
