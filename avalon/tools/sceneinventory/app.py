@@ -1246,11 +1246,14 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         selected_asset = self._assets_box.currentText()
         # Filter subsets by asset in dropdown
         if selected_asset:
-            parents = [io.find_one({
+            asset_doc = io.find_one({
                 "type": "asset",
                 "name": selected_asset
-            })]
-            return self._get_document_names("subset", parents)
+            })
+            return io.find({
+                "type": "subset",
+                "parent": asset_doc["_id"]
+            }).distinct("name")
 
         # Asset in dropdown is not selected
         # - filter subsets by selected assets in scene inventory
@@ -1472,7 +1475,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             return list(output_repres)
 
         # if asset is not selected and lod is selected
-        elif self.is_lod and selected_lod:
+        if self.is_lod and selected_lod:
             # TODO effective way
             output_repres = set()
             for item in self._items:
@@ -1536,6 +1539,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
             subset_names_by_asset_id[subset["parent"]].append(subset_name)
 
+        # TODO effective way
         query = {"$or": []}
         for asset_id, subset_names in subset_names_by_asset_id.items():
             query["$or"].append({
@@ -1582,21 +1586,12 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             return list()
         return list(output_repres)
 
-    def _get_document_names(self, document_type, parents=[]):
-        query = {"type": document_type}
-        if parents:
-            query["parent"] = {
-                "$in": [parent["_id"] for parent in parents]
-            }
-        return io.find(query).distinct("name")
-
     def _on_accept(self):
         # Use None when not a valid value or when placeholder value
         _asset = self._assets_box.get_valid_value()
         _subset = self._subsets_box.get_valid_value()
         _lod = self._lods_box.get_valid_value()
         _representation = self._representations_box.get_valid_value()
-
         if self.is_lod:
             if not any([_asset, _subset, _lod, _representation]):
                 self.log.error("Nothing selected")
