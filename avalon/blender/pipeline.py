@@ -397,10 +397,3 @@ class Loader(api.Loader):
     """Base class for Loader plug-ins."""
 
     hosts = ["blender"]
-
-    def __init__(self, context):
-        super().__init__(context)
-        self.fname = self.fname.replace(
-            api.registered_root(),
-            "$AVALON_PROJECTS",
-        )
