@@ -558,12 +558,6 @@ class Creator(api.Creator):
 class Loader(api.Loader):
     hosts = ["maya"]
 
-    def __init__(self, context):
-        super(Loader, self).__init__(context)
-        self.fname = self.fname.replace(
-            api.registered_root(), "$AVALON_PROJECTS"
-        )
-
 
 def publish():
     """Shorthand to publish from within host"""
