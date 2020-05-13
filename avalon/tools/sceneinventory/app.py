@@ -932,7 +932,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         else:
             subset_part = subset_text.replace(self.LOD_MARK, "")
 
-            asset_ids = [asset["_id"] for asset in self.content_assets]
+            asset_ids = list(self.content_assets.keys())
             subsets_of_context_assets = io.find({
                 "type": "subset",
                 "parent": {"$in": asset_ids}
