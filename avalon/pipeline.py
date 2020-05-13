@@ -335,8 +335,7 @@ class Application(Action):
     config = None
 
     def is_compatible(self, session):
-        required = ["AVALON_PROJECTS",
-                    "AVALON_PROJECT",
+        required = ["AVALON_PROJECT",
                     "AVALON_ASSET",
                     "AVALON_TASK"]
         missing = [x for x in required if x not in session]
