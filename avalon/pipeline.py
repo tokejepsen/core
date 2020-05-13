@@ -379,9 +379,8 @@ class Application(Action):
         env = acre.append(dict(os.environ), dyn_env)
 
         # Build environment
-        # env = os.environ.copy()
         env.update(self.config.get("environment", {}))
-        # env.update(dyn_env)
+        env.update(anatomy.root_environments())
         env.update(session)
 
         return env
