@@ -366,7 +366,10 @@ class Application(Action):
             tools_attr.append(session["AVALON_APP_NAME"])
 
         # collect all the 'environment' attributes from parents
-        asset = io.find_one({"type": "asset"})
+        asset = io.find_one({
+            "type": "asset",
+            "name": session["AVALON_ASSET"]
+        })
         tools = self.find_tools(asset)
         tools_attr.extend(tools)
 
