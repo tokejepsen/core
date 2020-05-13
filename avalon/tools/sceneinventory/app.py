@@ -705,7 +705,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         content_repres = {repre["_id"]: repre for repre in repres}
         version_ids = set(repre["parent"] for repre in content_repres.values())
         versions = io.find({
-            "type": "version",
+            "type": {"$in": ["version", "master_version"]},
             "_id": {"$in": list(version_ids)}
         })
 
