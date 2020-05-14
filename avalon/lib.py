@@ -52,6 +52,7 @@ def log(cls):
     # Package name appended, for filtering of LogRecord instances
     logname = "%s.%s" % (module, name)
     cls.log = logging.getLogger(logname)
+
     # All messages are handled by root-logger
     cls.log.propagate = True
 
