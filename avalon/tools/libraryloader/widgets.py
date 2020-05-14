@@ -475,7 +475,9 @@ class VersionTextEdit(loader_widgets.VersionTextEdit):
         if not source:
             return
 
-        path = source.format(root=lib.registered_root(self.dbcon))
+        path = source.format(
+            root=lib.RegisteredRoots.registered_root(self.dbcon)
+        )
         clipboard = QtWidgets.QApplication.clipboard()
         clipboard.setText(path)
 
