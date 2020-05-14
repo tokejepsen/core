@@ -335,8 +335,7 @@ class Application(Action):
     config = None
 
     def is_compatible(self, session):
-        required = ["AVALON_PROJECTS",
-                    "AVALON_PROJECT",
+        required = ["AVALON_PROJECT",
                     "AVALON_ASSET",
                     "AVALON_TASK"]
         missing = [x for x in required if x not in session]
@@ -367,7 +366,10 @@ class Application(Action):
             tools_attr.append(session["AVALON_APP_NAME"])
 
         # collect all the 'environment' attributes from parents
-        asset = io.find_one({"type": "asset"})
+        asset = io.find_one({
+            "type": "asset",
+            "name": session["AVALON_ASSET"]
+        })
         tools = self.find_tools(asset)
         tools_attr.extend(tools)
 
@@ -377,9 +379,8 @@ class Application(Action):
         env = acre.append(dict(os.environ), dyn_env)
 
         # Build environment
-        # env = os.environ.copy()
         env.update(self.config.get("environment", {}))
-        # env.update(dyn_env)
+        env.update(anatomy.root_environments())
         env.update(session)
 
         return env
