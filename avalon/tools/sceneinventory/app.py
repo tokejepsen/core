@@ -698,35 +698,95 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             io.ObjectId(item["representation"])
             for item in self._items
         ]
-        repres = io.find({
-            "type": "representation",
+        repres = list(io.find({
+            "type": {"$in": ["representation", "archived_representation"]},
             "_id": {"$in": repre_ids}
-        })
-        content_repres = {repre["_id"]: repre for repre in repres}
-        version_ids = set(repre["parent"] for repre in content_repres.values())
+        }))
+        repres_by_id = {repre["_id"]: repre for repre in repres}
+
+        content_repres = {}
+        archived_repres = []
+        missing_repres = []
+        version_ids = []
+        for repre_id in repre_ids:
+            if repre_id not in repres_by_id:
+                missing_repres.append(repre_id)
+
+            elif repres_by_id[repre_id]["type"] == "archived_representation":
+                archived_repres.append(repres_by_id[repre_id])
+                version_ids.append(repre_id)
+
+            else:
+                content_repres[repre_id] = repres_by_id[repre_id]
+                version_ids.append(repre_id)
+
         versions = io.find({
             "type": {"$in": ["version", "master_version"]},
-            "_id": {"$in": list(version_ids)}
+            "_id": {"$in": list(set(version_ids))}
         })
+        content_versions = {version["_id"]: version for version in versions}
 
-        content_versions = {ver["_id"]: ver for ver in versions}
-        subset_ids = set(ver["parent"] for ver in content_versions.values())
+        missing_versions = []
+        subset_ids = []
+        for version_id in version_ids:
+            if version_id not in content_versions:
+                missing_versions.append(version_id)
+            else:
+                subset_ids.append(content_versions[version_id]["parent"])
+
         subsets = io.find({
-            "type": "subset",
-            "_id": {"$in": list(subset_ids)}
+            "type": {"$in": ["subset", "archived_subset"]},
+            "_id": {"$in": subset_ids}
         })
+        subsets_by_id = {sub["_id"]: sub for sub in subsets}
 
-        content_subsets = {sub["_id"]: sub for sub in subsets}
-        asset_ids = set(sub["parent"] for sub in content_subsets.values())
+        asset_ids = []
+        archived_subsets = []
+        missing_subsets = []
+        content_subsets = {}
+        for subset_id in subset_ids:
+            if subset_id not in subsets_by_id:
+                missing_subsets.append(subset_id)
+
+            elif subsets_by_id[subset_id]["type"] == "archived_subset":
+                asset_ids.append(subset_id)
+                archived_subsets.append(subsets_by_id[subset_id])
+            else:
+                asset_ids.append(subset_id)
+                content_subsets[subset_id] = subsets_by_id[subset_id]
+
         assets = io.find({
-            "type": "asset",
+            "type": {"$in": ["asset", "archived_asset"]},
             "_id": {"$in": list(asset_ids)}
         })
+        assets_by_id = {asset["_id"]: asset for asset in assets}
 
-        self.content_assets = {asset["_id"]: asset for asset in assets}
+        missing_assets = []
+        archived_assets = []
+        content_assets = {}
+        for asset_id in asset_ids:
+            if asset_id not in assets_by_id:
+                missing_assets.append(asset_id)
+
+            elif assets_by_id[asset_id]["type"] == "archived_asset":
+                archived_assets.append(assets_by_id[asset_id])
+
+            else:
+                content_assets[asset_id] = assets_by_id[asset_id]
+
+        self.content_assets = content_assets
         self.content_subsets = content_subsets
         self.content_versions = content_versions
         self.content_repres = content_repres
+
+        self.missing_assets = missing_assets
+        self.missing_versions = missing_versions
+        self.missing_subsets = missing_subsets
+        self.missing_repres = missing_repres
+
+        self.archived_assets = archived_assets
+        self.archived_subsets = archived_subsets
+        self.archived_repres = archived_repres
 
     def connections(self):
         self._accept_btn.clicked.connect(self._on_accept)
