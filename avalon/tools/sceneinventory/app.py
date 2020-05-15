@@ -711,14 +711,14 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         for repre_id in repre_ids:
             if repre_id not in repres_by_id:
                 missing_repres.append(repre_id)
-
             elif repres_by_id[repre_id]["type"] == "archived_representation":
-                archived_repres.append(repres_by_id[repre_id])
-                version_ids.append(repre_id)
-
+                repre = repres_by_id[repre_id]
+                archived_repres.append(repre)
+                version_ids.append(repre["parent"])
             else:
+                repre = repres_by_id[repre_id]
                 content_repres[repre_id] = repres_by_id[repre_id]
-                version_ids.append(repre_id)
+                version_ids.append(repre["parent"])
 
         versions = io.find({
             "type": {"$in": ["version", "master_version"]},
@@ -747,13 +747,14 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         for subset_id in subset_ids:
             if subset_id not in subsets_by_id:
                 missing_subsets.append(subset_id)
-
             elif subsets_by_id[subset_id]["type"] == "archived_subset":
-                asset_ids.append(subset_id)
-                archived_subsets.append(subsets_by_id[subset_id])
+                subset = subsets_by_id[subset_id]
+                asset_ids.append(subset["parent"])
+                archived_subsets.append(subset)
             else:
-                asset_ids.append(subset_id)
-                content_subsets[subset_id] = subsets_by_id[subset_id]
+                subset = subsets_by_id[subset_id]
+                asset_ids.append(subset["parent"])
+                content_subsets[subset_id] = subset
 
         assets = io.find({
             "type": {"$in": ["asset", "archived_asset"]},
@@ -767,10 +768,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         for asset_id in asset_ids:
             if asset_id not in assets_by_id:
                 missing_assets.append(asset_id)
-
             elif assets_by_id[asset_id]["type"] == "archived_asset":
                 archived_assets.append(assets_by_id[asset_id])
-
             else:
                 content_assets[asset_id] = assets_by_id[asset_id]
 
@@ -783,6 +782,12 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self.missing_versions = missing_versions
         self.missing_subsets = missing_subsets
         self.missing_repres = missing_repres
+        self.missing_docs = (
+            bool(missing_assets)
+            or bool(missing_versions)
+            or bool(missing_subsets)
+            or bool(missing_repres)
+        )
 
         self.archived_assets = archived_assets
         self.archived_subsets = archived_subsets
@@ -810,44 +815,129 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         if (not self.fill_check or not self.initialized) and refresh_type > 0:
             return
 
+        asset_values = None
+        subset_values = None
+        lod_values = None
+        repre_values = None
         if refresh_type < 1:
-            assets = sorted(self._get_assets())
-            self.fill_check = False
-            self._assets_box.populate(assets)
-            self.fill_check = True
+            asset_values = sorted(self._get_assets())
 
-        if refresh_type < 2:
-            last_subset = self._subsets_box.currentText()
+        # Set other comboboxes to empty if any document is missing or any asset
+        # of loaded representations is archived.
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._subsets_box.get_valid_value()
+        selected_lod = self._lods_box.get_valid_value()
+        selected_repre = self._representations_box.get_valid_value()
+        if (
+            selected_asset is None
+            and (self.missing_docs or self.archived_assets)
+        ):
+            subset_values = list()
+            lod_values = list()
+            repre_values = list()
 
-            self.is_lod = self._compute_is_lod()
-            subsets, gs = self._group_lods(sorted(self._get_subsets()))
-            self.fill_check = False
-            self._subsets_box.populate(subsets)
-            self.fill_check = True
+        self.is_lod = self._compute_is_lod()
 
-            if last_subset and last_subset in list(subsets):
+        if refresh_type < 2 and subset_values is None:
+            subset_values = self._group_lods(sorted(self._get_subsets()))[0]
+
+        if refresh_type < 3 and lod_values is None:
+            lod_values = self._lod_box_values()
+
+        if refresh_type < 4 and repre_values is None:
+            repre_values = sorted(self._representations_box_values())
+
+        # Fill comboboxes with values
+        self._fill_comboboxes(
+            (asset_values, subset_values, lod_values, repre_values),
+            (selected_asset, selected_subset, selected_lod, selected_repre)
+        )
+
+        self._lod_label.setVisible(self.is_lod)
+        self._lods_box.setVisible(self.is_lod)
+
+        self.set_labels()
+        self.validate()
+
+    def _fill_comboboxes(self, values, selections):
+        asset_values, subset_values, lod_values, repre_values = values
+        selected_asset, selected_subset, selected_lod, selected_repre = (
+            selections
+        )
+        # Fill comboboxes
+        self.fill_check = False
+
+        # Fill assets
+        if asset_values is not None:
+            self._assets_box.populate(asset_values)
+            if selected_asset and selected_asset in asset_values:
                 index = None
                 for idx in range(self._subsets_box.count()):
-                    if last_subset == str(self._subsets_box.itemText(idx)):
+                    if selected_asset == str(self._assets_box.itemText(idx)):
+                        index = idx
+                        break
+                if index is not None:
+                    self._assets_box.setCurrentIndex(index)
+
+        # Fill subsets
+        if subset_values is not None:
+            self._subsets_box.populate(subset_values)
+            # Keep same selection if possible
+            if selected_subset and selected_subset in subset_values:
+                index = None
+                for idx in range(self._subsets_box.count()):
+                    if selected_subset == str(self._subsets_box.itemText(idx)):
                         index = idx
                         break
                 if index is not None:
                     self._subsets_box.setCurrentIndex(index)
 
-        if refresh_type < 3:
-            self._lods_box.setVisible(self.is_lod)
-            self._lod_label.setVisible(self.is_lod)
-            if self.is_lod:
-                self._fill_lod_box()
+        # Fill Lod combobox
+        if lod_values is not None:
+            self._lods_box.populate(lod_values)
+            if selected_lod and selected_lod in lod_values:
+                index = None
+                for idx in range(self._lods_box.count()):
+                    if selected_lod == str(self._lods_box.itemText(idx)):
+                        index = idx
+                        break
+                if index is not None:
+                    self._lods_box.setCurrentIndex(index)
 
-        if refresh_type < 4:
-            self._fill_representations_box()
+        if repre_values is not None:
+            self._representations_box.populate(repre_values)
+            if selected_repre and selected_repre in lod_values:
+                index = None
+                for idx in range(self._representations_box.count()):
+                    if selected_lod == str(
+                        self._representations_box.itemText(idx)
+                    ):
+                        index = idx
+                        break
+                if index is not None:
+                    self._representations_box.setCurrentIndex(index)
 
-        self.set_labels()
-        self.validate()
+        self.fill_check = True
 
     def _compute_is_lod(self):
-        selected_asset = self._assets_box.currentText()
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._assets_box.get_valid_value()
+
+        # Return false if there are missing assets and asset is not selected
+        if (
+            selected_asset is None
+            and (self.missing_docs or self.archived_assets)
+        ):
+            return False
+
+        # If subset is selected
+        if selected_subset:
+            # Is lod when selected value ends on LOD_MARK `(Lods)`
+            if selected_subset.endswith(self.LOD_MARK):
+                return True
+            return False
+
+        # Care only about asset if asset is selected
         if selected_asset:
             asset = io.find_one({
                 "type": "asset",
@@ -859,6 +949,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     return True
             return False
 
+        # If subset and asset are not selected
         subset_parents = []
         processed_parents = []
         for subset in self.content_subsets.values():
@@ -897,45 +988,18 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 return False
         return True
 
-    def _fill_representations_box(self):
-        last_repre = self._representations_box.currentText()
-        representations = sorted(self._get_representations())
-        self.fill_check = False
-        self._representations_box.populate(representations)
+    def _lod_box_values(self):
+        if not self.is_lod:
+            return list()
 
-        if (last_repre != "" and last_repre in list(representations)):
-            index = None
-            for i in range(self._representations_box.count()):
-                if last_repre == self._representations_box.itemText(i):
-                    index = i
-                    break
-            if index is not None:
-                self._representations_box.setCurrentIndex(index)
-        self.fill_check = True
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._subsets_box.get_valid_value()
 
-    def _fill_lod_box(self):
-        asset_text = self._assets_box.currentText()
-        subset_text = self._subsets_box.currentText()
-        last_lod = self._lods_box.currentText()
-
-        if subset_text:
-            is_lod = self.LOD_MARK in subset_text
-            # self.is_lod = is_lod
-            self._lods_box.setVisible(is_lod)
-            self._lod_label.setVisible(is_lod)
-            if not is_lod:
-                self.fill_check = False
-                self._lods_box.populate([self.LOD_NOT_LOD])
-                self._lods_box.setCurrentIndex(0)
-                self.fill_check = True
-                return
-
-        lods = None
-        if asset_text and subset_text:
-            subset_part = subset_text.replace(self.LOD_MARK, "")
+        if selected_asset and selected_subset:
+            subset_part = selected_subset.replace(self.LOD_MARK, "")
             asset = io.find_one({
                 "type": "asset",
-                "name": asset_text
+                "name": selected_asset
             })
             subsets = io.find({
                 "type": "subset",
@@ -948,17 +1012,15 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     continue
                 lod_regex_result = re.search(self.LOD_REGEX, subset["name"])
                 if lod_regex_result:
-                    lod = lod_regex_result.group(0).replace(
+                    lods.add(lod_regex_result.group(0).replace(
                         self.LOD_SPLITTER, ""
-                    )
-                else:
-                    lod = self.LOD_NOT_LOD
-                lods.add(lod)
+                    ))
+            return sorted(list(lods))
 
-        elif asset_text:
+        if selected_asset:
             asset = io.find_one({
                 "type": "asset",
-                "name": asset_text
+                "name": selected_asset
             })
             subsets = io.find({
                 "type": "subset",
@@ -967,78 +1029,56 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             subset_names, groups = self._group_lods(
                 sorted(subsets.distinct("name"))
             )
-            is_lod = True
-            for name in subset_names:
-                if self.LOD_MARK not in name:
-                    is_lod = False
-                    break
-
-            self._lods_box.setVisible(is_lod)
-            self._lod_label.setVisible(is_lod)
-            if not is_lod:
-                self.fill_check = False
-                self._lods_box.populate([self.LOD_NOT_LOD])
-                self._lods_box.setCurrentIndex(0)
-                self.fill_check = True
-                return
-
+            lods = None
             for _lods in groups.values():
                 sub_lods = set(lod for lod in _lods)
                 if lods is None:
                     lods = sub_lods
                 else:
                     lods = (lods & sub_lods)
+            return sorted(list(lods))
 
-        else:
-            subset_part = subset_text.replace(self.LOD_MARK, "")
+        asset_ids = list(self.content_assets.keys())
+        subsets_of_context_assets = io.find({
+            "type": "subset",
+            "parent": {"$in": asset_ids}
+        })
 
-            asset_ids = list(self.content_assets.keys())
-            subsets_of_context_assets = io.find({
-                "type": "subset",
-                "parent": {"$in": asset_ids}
-            })
+        subsets_by_parent_id = collections.defaultdict(list)
 
-            subsets_by_parent_id = collections.defaultdict(list)
+        if selected_subset:
+            subset_part = selected_subset.replace(self.LOD_MARK, "")
             for subset in subsets_of_context_assets:
                 if subset["name"].startswith(subset_part):
                     subsets_by_parent_id[subset["parent"]].append(subset)
 
-            for subsets in subsets_by_parent_id.values():
-                item_lods = set()
-                for subset in subsets:
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, subset["name"]
-                    )
-                    if lod_regex_result:
-                        lod = lod_regex_result.group(0).replace(
-                            self.LOD_SPLITTER, ""
-                        )
-                    else:
-                        lod = self.LOD_NOT_LOD
-                    item_lods.add(lod)
-
-                if lods is None:
-                    lods = item_lods
-                else:
-                    lods = (lods & item_lods)
-
-        if lods is None:
-            lods = list()
         else:
-            lods = sorted(list(lods))
-        self.fill_check = False
-        # fill lods into combobox
-        self._lods_box.populate(lods)
-        # try select last LOD if was selected
-        if last_lod != "":
-            index = None
-            for i in range(self._lods_box.count()):
-                if last_lod == self._lods_box.itemText(i):
-                    index = i
-                    break
-            if index is not None:
-                self._lods_box.setCurrentIndex(index)
-        self.fill_check = True
+            for subset in subsets_of_context_assets:
+                subsets_by_parent_id[subset["parent"]].append(subset)
+
+        if not subsets_by_parent_id:
+            return list()
+
+        lods = None
+        for subsets in subsets_by_parent_id.values():
+            item_lods = set()
+            for subset in subsets:
+                lod_regex_result = re.search(self.LOD_REGEX, subset["name"])
+                if lod_regex_result:
+                    item_lods.add(lod_regex_result.group(0).replace(
+                        self.LOD_SPLITTER, ""
+                    ))
+
+            if lods is None:
+                lods = item_lods
+            else:
+                lods = (lods & item_lods)
+
+            # Skip next processing if set is already empty
+            if not lods:
+                return list()
+
+        return sorted(list(lods))
 
     def set_labels(self):
         default = "*No changes"
@@ -1303,17 +1343,17 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         return filtered_assets
 
     def _get_subsets(self):
-        selected_asset = self._assets_box.currentText()
+        selected_asset = self._assets_box.get_valid_value()
         # Filter subsets by asset in dropdown
         if selected_asset:
             asset_doc = io.find_one({
                 "type": "asset",
                 "name": selected_asset
             })
-            return io.find({
+            return list(io.find({
                 "type": "subset",
                 "parent": asset_doc["_id"]
-            }).distinct("name")
+            }).distinct("name"))
 
         # Asset in dropdown is not selected
         # - filter subsets by selected assets in scene inventory
@@ -1384,7 +1424,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         return subsets_out, groups
 
-    def _get_representations(self):
+    def _representations_box_values(self):
         selected_asset = self._assets_box.currentText()
         selected_subset = self._subsets_box.currentText()
         selected_lod = self._lods_box.currentText()
@@ -1416,9 +1456,9 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 else:
                     output_repres = (output_repres & merge_repres)
 
-            if output_repres is not None:
-                return list(output_repres)
-            return list()
+            if output_repres is None:
+                return list()
+            return list(output_repres)
 
         # If everything is selected
         if (
