@@ -642,6 +642,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         accept_btn.setIcon(accept_icon)
         accept_btn.setFixedWidth(24)
         accept_btn.setFixedHeight(24)
+        accept_btn_menu = QtWidgets.QMenu(accept_btn)
+        accept_btn.setMenu(accept_btn_menu)
 
         asset_layout.addWidget(self._assets_box)
         asset_layout.addWidget(self._asset_label)
@@ -662,7 +664,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._representations_box.currentIndexChanged.connect(
             self.on_combobox_changed
         )
-        self._accept_btn.clicked.connect(self._on_accept)
+        self._accept_btn.clicked.connect(self.btn_clicked)
+        accept_btn_menu.triggered.connect(self._on_accept)
 
         main_layout.addLayout(context_layout)
         self.setLayout(main_layout)
@@ -842,15 +845,142 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             repre_values = list()
 
         # Fill comboboxes with values
+        loaders = self._loaders(asset_ok, subset_ok, repre_ok)
         self._fill_comboboxes(
             (asset_values, subset_values, repre_values),
             (selected_asset, selected_subset, selected_repre)
         )
-
         self.set_labels()
-        self.apply_validations(asset_ok, subset_ok, repre_ok)
+        self.apply_validations(asset_ok, subset_ok, repre_ok, bool(loaders))
+        self._build_loader_menu(loaders)
 
         self.fill_check = True
+
+    def _loaders(self, asset_ok, subset_ok, repre_ok):
+        if not all((asset_ok, subset_ok, repre_ok)):
+            return list()
+
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._subsets_box.get_valid_value()
+        selected_repre = self._representations_box.get_valid_value()
+
+        if selected_asset:
+            asset_doc = io.find_one({"type": "asset", "name": selected_asset})
+            asset_ids = [asset_doc["_id"]]
+        else:
+            asset_ids = list(self.content_assets.keys())
+
+        subset_query = {
+            "type": "subset",
+            "parent": {"$in": asset_ids}
+        }
+        if selected_subset:
+            subset_query["name"] = selected_subset
+
+        subset_docs = list(io.find(subset_query))
+        versions = io.find({
+            "type": "version",
+            "parent": {"$in": [subset["_id"] for subset in subset_docs]}
+        }, sort=[("name", -1)])
+
+        highest_version_mapping = {}
+        for version in versions:
+            subset_id = version["parent"]
+            if subset_id not in highest_version_mapping:
+                highest_version_mapping[subset_id] = version
+
+        higher_versions_by_id = {
+            version["_id"]: version
+            for version in highest_version_mapping.values()
+        }
+        repre_names = []
+        if selected_repre:
+            repre_names.append(selected_repre)
+        else:
+            for repre_doc in self.content_repres.values():
+                repre_names.append(repre_doc["name"])
+
+        repre_docs = io.find({
+            "type": "representation",
+            "name": {"$in": repre_names},
+            "parent": {"$in": list(higher_versions_by_id.keys())}
+        })
+
+        repres_by_parent_id = collections.defaultdict(set)
+        repres_by_name = collections.defaultdict(list)
+        for repre_doc in repre_docs:
+            repres_by_parent_id[repre_doc["parent"]].add(repre_doc["name"])
+            repres_by_name[repre_doc["name"]].append(repre_doc)
+
+        possible_repre_names = None
+        for repre_names in repres_by_parent_id.values():
+            if possible_repre_names is None:
+                possible_repre_names = repre_names
+            else:
+                possible_repre_names = possible_repre_names & repre_names
+
+        ready_repres = list()
+        for repre_name in possible_repre_names or list():
+            ready_repres.extend(repres_by_name[repre_name])
+
+        return self._get_loaders(ready_repres)
+
+    def _get_loaders(self, representations):
+        if not representations:
+            return list()
+
+        available_loaders = filter(
+            lambda l: not (hasattr(l, "is_utility") and l.is_utility),
+            api.discover(api.Loader)
+        )
+
+        loaders = set()
+
+        for representation in representations:
+            for loader in api.loaders_from_representation(
+                available_loaders,
+                representation
+            ):
+                loaders.add(loader)
+
+        return loaders
+
+    def _build_loader_menu(self, loaders):
+        menu = self._accept_btn.menu()
+        menu.clear()
+
+        if not loaders:
+            action = menu.addAction("No compatible loaders")
+            action.setData(None)
+            return
+
+        loaders_by_label = collections.defaultdict(list)
+        for loader in loaders:
+            # Label
+            label = getattr(loader, "label", None)
+            if label is None:
+                label = loader.__name__
+
+            loaders_by_label[label].append(loader)
+
+        for label in sorted(loaders_by_label.keys()):
+            for loader in loaders_by_label[label]:
+                action = menu.addAction(label)
+                action.setData(loader)
+
+                # Support font-awesome icons using the `.icon` and `.color`
+                # attributes on plug-ins.
+                icon = getattr(loader, "icon", None)
+                if icon is not None:
+                    try:
+                        key = "fa.{0}".format(icon)
+                        color = getattr(loader, "color", "white")
+                        action.setIcon(qtawesome.icon(key, color=color))
+                    except Exception as e:
+                        print("Unable to set icon for loader "
+                              "{}: {}".format(loader, e))
+
+                menu.addAction(action)
 
     def _fill_comboboxes(self, values, selections):
         asset_values, subset_values, repre_values = values
@@ -895,24 +1025,17 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 if index is not None:
                     self._representations_box.setCurrentIndex(index)
 
-    def set_labels(
-        self, asset_label=None, subset_label=None, repre_label=None
-    ):
-        if asset_label is None:
-            asset_label = self._assets_box.get_valid_value()
-
-        if subset_label is None:
-            subset_label = self._subsets_box.get_valid_value()
-
-        if repre_label is None:
-            repre_label = self._representations_box.get_valid_value()
+    def set_labels(self):
+        asset_label = self._assets_box.get_valid_value()
+        subset_label = self._subsets_box.get_valid_value()
+        repre_label = self._representations_box.get_valid_value()
 
         default = "*No changes"
         self._asset_label.setText(asset_label or default)
         self._subset_label.setText(subset_label or default)
         self._repre_label.setText(repre_label or default)
 
-    def apply_validations(self, asset_ok, subset_ok, repre_ok):
+    def apply_validations(self, asset_ok, subset_ok, repre_ok, loaders_ok):
         error_msg = "*Please select"
         error_sheet = "border: 1px solid red;"
         success_sheet = "border: 1px solid green;"
@@ -921,7 +1044,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         subset_sheet = None
         repre_sheet = None
         accept_sheet = None
-        all_ok = asset_ok and subset_ok and repre_ok
+        all_ok = asset_ok and subset_ok and repre_ok and loaders_ok
 
         if asset_ok is False:
             asset_sheet = error_sheet
@@ -929,7 +1052,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         if subset_ok is False:
             subset_sheet = error_sheet
             self._subset_label.setText(error_msg)
-        if repre_ok is False:
+        if repre_ok is False or loaders_ok is False:
             repre_sheet = error_sheet
             self._repre_label.setText(error_msg)
         if all_ok:
@@ -1183,23 +1306,137 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 return False
         return True
 
-    def _on_accept(self):
+    def btn_clicked(self):
+        self._accept_btn.showMenu()
+
+    def _on_accept(self, action):
+        selected_loader = action.data()
+        if selected_loader is None:
+            return
+
         # Use None when not a valid value or when placeholder value
         selected_asset = self._assets_box.get_valid_value()
         selected_subset = self._subsets_box.get_valid_value()
         selected_representation = self._representations_box.get_valid_value()
-        if not any([selected_asset, selected_subset, selected_representation]):
-            self.log.error("Nothing selected")
-            return
 
-        for item in self._items:
-            try:
-                switch_item(
-                    item,
-                    asset_name=selected_asset,
-                    subset_name=selected_subset,
-                    representation_name=selected_representation
+        if selected_asset:
+            asset_doc = io.find_one({"type": "asset", "name": selected_asset})
+            asset_docs_by_id = {asset_doc["_id"]: asset_doc}
+        else:
+            asset_docs_by_id = self.content_assets
+
+        asset_docs_by_name = {
+            asset_doc["name"]: asset_doc
+            for asset_doc in asset_docs_by_id.values()
+        }
+
+        asset_ids = list(asset_docs_by_id.keys())
+
+        subset_query = {
+            "type": "subset",
+            "parent": {"$in": asset_ids}
+        }
+        if selected_subset:
+            subset_query["name"] = selected_subset
+
+        subset_docs = list(io.find(subset_query))
+        subset_ids = []
+        subset_docs_by_parent_and_name = collections.defaultdict(dict)
+        for subset in subset_docs:
+            subset_ids.append(subset["_id"])
+            parent_id = subset["parent"]
+            name = subset["name"]
+            subset_docs_by_parent_and_name[parent_id][name] = subset
+
+        # versions
+        version_docs = list(io.find({
+            "type": "version",
+            "parent": {"$in": subset_ids}
+        }, sort=[("name", -1)]))
+
+        master_version_docs = list(io.find({
+            "type": "master_version",
+            "parent": {"$in": subset_ids}
+        }))
+
+        version_ids = list()
+
+        version_docs_by_parent_id = {}
+        for version_doc in version_docs:
+            parent_id = version_doc["parent"]
+            if parent_id not in version_docs_by_parent_id:
+                version_ids.append(version_doc)
+                version_docs_by_parent_id[parent_id] = version_doc
+
+        master_version_docs_by_parent_id = {}
+        for master_version_doc in master_version_docs:
+            version_ids.append(master_version_doc["_id"])
+            parent_id = master_version_doc["parent"]
+            master_version_docs_by_parent_id[parent_id] = master_version_doc
+
+        repre_docs = io.find({
+            "type": "representation",
+            "parent": {"$in": version_ids}
+        })
+        repre_docs_by_parent_id_by_name = collections.defaultdict(dict)
+        for repre_doc in repre_docs:
+            parent_id = repre_doc["parent"]
+            name = repre_doc["name"]
+            repre_docs_by_parent_id_by_name[parent_id][name] = repre_doc
+
+        for container in self._items:
+            container_repre_id = io.ObjectId(container["representation"])
+            container_repre = self.content_repres[container_repre_id]
+            container_repre_name = container_repre["name"]
+
+            container_version_id = container_repre["parent"]
+            container_version = self.content_versions[container_version_id]
+
+            container_subset_id = container_version["parent"]
+            container_subset = self.content_subsets[container_subset_id]
+            container_subset_name = container_subset["name"]
+
+            container_asset_id = container_subset["parent"]
+            container_asset = self.content_assets[container_asset_id]
+            container_asset_name = container_asset["name"]
+
+            if selected_asset:
+                asset_doc = asset_docs_by_name[selected_asset]
+            else:
+                asset_doc = asset_docs_by_name[container_asset_name]
+
+            subsets_by_name = subset_docs_by_parent_and_name[asset_doc["_id"]]
+            if selected_subset:
+                subset_doc = subsets_by_name[selected_subset]
+            else:
+                subset_doc = subsets_by_name[container_subset_name]
+
+            repre_doc = None
+            subset_id = subset_doc["_id"]
+            if container_version["type"] == "master_version":
+                master_version = master_version_docs_by_parent_id.get(
+                    subset_id
                 )
+                if master_version:
+                    _repres = repre_docs_by_parent_id_by_name.get(
+                        master_version["_id"]
+                    )
+                    if selected_representation:
+                        repre_doc = _repres.get(selected_representation)
+                    else:
+                        repre_doc = _repres.get(container_repre_name)
+
+            if not repre_doc:
+                version_doc = version_docs_by_parent_id[subset_id]
+                version_id = version_doc["_id"]
+                repres_by_name = repre_docs_by_parent_id_by_name[version_id]
+                if selected_representation:
+                    repre_doc = repres_by_name[selected_representation]
+                else:
+                    repre_doc = repres_by_name[container_repre_name]
+
+            try:
+                api.switch(container, repre_doc, selected_loader)
             except Exception:
                 self.log.warning(
                     (
