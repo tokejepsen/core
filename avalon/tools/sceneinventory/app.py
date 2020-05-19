@@ -3,7 +3,6 @@ import sys
 import logging
 import collections
 from functools import partial
-import traceback
 
 from ...vendor.Qt import QtWidgets, QtCore
 from ...vendor import qtawesome
@@ -615,6 +614,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
     def __init__(self, parent=None, items=None):
         QtWidgets.QDialog.__init__(self, parent)
 
+        self.setWindowTitle("Switch selected items ...")
+
         # Force and keep focus dialog
         self.setModal(True)
 
@@ -661,12 +662,10 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._representations_box.currentIndexChanged.connect(
             self.on_combobox_changed
         )
+        self._accept_btn.clicked.connect(self._on_accept)
 
         main_layout.addLayout(context_layout)
         self.setLayout(main_layout)
-        self.setWindowTitle("Switch selected items ...")
-
-        self.connections()
 
         self._items = items
         self._prepare_content_data()
@@ -786,9 +785,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self.archived_assets = archived_assets
         self.archived_subsets = archived_subsets
         self.archived_repres = archived_repres
-
-    def connections(self):
-        self._accept_btn.clicked.connect(self._on_accept)
 
     def on_combobox_changed(self):
         self.refresh(1)
