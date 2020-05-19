@@ -3,7 +3,7 @@ import sys
 import logging
 import collections
 from functools import partial
-import re
+import traceback
 
 from ...vendor.Qt import QtWidgets, QtCore
 from ...vendor import qtawesome
@@ -612,12 +612,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
     initialized = False
     switched = QtCore.Signal()
 
-    is_lod = False
-    LOD_REGEX = re.compile(r"_(LOD\d+)")
-    LOD_MARK = "(LODs)"
-    LOD_SPLITTER = "_"
-    LOD_NOT_LOD = "< without LOD >"
-
     def __init__(self, parent=None, items=None):
         QtWidgets.QDialog.__init__(self, parent)
 
@@ -628,21 +622,18 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         self._assets_box = SearchComboBox(placeholder="<asset>")
         self._subsets_box = SearchComboBox(placeholder="<subset>")
-        self._lods_box = SearchComboBox(placeholder="<lod>")
         self._representations_box = SearchComboBox(
             placeholder="<representation>"
         )
 
         self._asset_label = QtWidgets.QLabel("")
         self._subset_label = QtWidgets.QLabel("")
-        self._lod_label = QtWidgets.QLabel("")
         self._repre_label = QtWidgets.QLabel("")
 
         main_layout = QtWidgets.QVBoxLayout()
         context_layout = QtWidgets.QHBoxLayout()
         asset_layout = QtWidgets.QVBoxLayout()
         subset_layout = QtWidgets.QVBoxLayout()
-        lod_layout = QtWidgets.QVBoxLayout()
         repre_layout = QtWidgets.QVBoxLayout()
 
         accept_icon = qtawesome.icon("fa.check", color="white")
@@ -655,24 +646,20 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         asset_layout.addWidget(self._asset_label)
         subset_layout.addWidget(self._subsets_box)
         subset_layout.addWidget(self._subset_label)
-        lod_layout.addWidget(self._lods_box)
-        lod_layout.addWidget(self._lod_label)
         repre_layout.addWidget(self._representations_box)
         repre_layout.addWidget(self._repre_label)
 
         context_layout.addLayout(asset_layout)
         context_layout.addLayout(subset_layout)
-        context_layout.addLayout(lod_layout)
         context_layout.addLayout(repre_layout)
         context_layout.addWidget(accept_btn)
 
         self._accept_btn = accept_btn
 
-        self._assets_box.currentIndexChanged.connect(self.on_assets_change)
-        self._subsets_box.currentIndexChanged.connect(self.on_subset_change)
-        self._lods_box.currentIndexChanged.connect(self.on_lod_change)
+        self._assets_box.currentIndexChanged.connect(self.on_combobox_changed)
+        self._subsets_box.currentIndexChanged.connect(self.on_combobox_changed)
         self._representations_box.currentIndexChanged.connect(
-            self.on_repre_change
+            self.on_combobox_changed
         )
 
         main_layout.addLayout(context_layout)
@@ -683,7 +670,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         self._items = items
         self._prepare_content_data()
-        self.refresh(0)
+        self.refresh()
 
         self.setMinimumWidth(self.MIN_WIDTH)
 
@@ -724,7 +711,12 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             "type": {"$in": ["version", "master_version"]},
             "_id": {"$in": list(set(version_ids))}
         })
-        content_versions = {version["_id"]: version for version in versions}
+        content_versions = {}
+        has_master_versions = False
+        for version in versions:
+            content_versions[version["_id"]] = version
+            if not has_master_versions:
+                has_master_versions = version["type"] == "master_version"
 
         missing_versions = []
         subset_ids = []
@@ -778,6 +770,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self.content_versions = content_versions
         self.content_repres = content_repres
 
+        self.has_master_versions = has_master_versions
+
         self.missing_assets = missing_assets
         self.missing_versions = missing_versions
         self.missing_subsets = missing_subsets
@@ -796,77 +790,77 @@ class SwitchAssetDialog(QtWidgets.QDialog):
     def connections(self):
         self._accept_btn.clicked.connect(self._on_accept)
 
-    def on_assets_change(self):
+    def on_combobox_changed(self):
         self.refresh(1)
 
-    def on_subset_change(self):
-        self.refresh(2)
-
-    def on_lod_change(self):
-        # if self.fill_check and self.initialized:
-        self.refresh(3)
-
-    def on_repre_change(self):
-        # if self.fill_check and self.initialized:
-        self.refresh(4)
-
-    def refresh(self, refresh_type):
+    def refresh(self, refresh_type=0):
         """Build the need comboboxes with content"""
         if (not self.fill_check or not self.initialized) and refresh_type > 0:
             return
 
+        self.fill_check = False
+
+        asset_ok = True
+        subset_ok = True
+        repre_ok = True
+
         asset_values = None
         subset_values = None
-        lod_values = None
         repre_values = None
+
         if refresh_type < 1:
-            asset_values = sorted(self._get_assets())
+            asset_values = self._get_asset_box_values()
 
         # Set other comboboxes to empty if any document is missing or any asset
         # of loaded representations is archived.
         selected_asset = self._assets_box.get_valid_value()
         selected_subset = self._subsets_box.get_valid_value()
-        selected_lod = self._lods_box.get_valid_value()
         selected_repre = self._representations_box.get_valid_value()
-        if (
-            selected_asset is None
-            and (self.missing_docs or self.archived_assets)
-        ):
-            subset_values = list()
-            lod_values = list()
-            repre_values = list()
+        asset_ok = self._is_asset_ok(selected_asset)
 
-        self.is_lod = self._compute_is_lod()
+        if asset_ok:
+            subset_values = self._get_subset_box_values()
+            if not subset_values:
+                asset_ok = False
+            else:
+                subset_ok = self._is_subset_ok(
+                    selected_asset, selected_subset, subset_values
+                )
 
-        if refresh_type < 2 and subset_values is None:
-            subset_values = self._group_lods(sorted(self._get_subsets()))[0]
-
-        if refresh_type < 3 and lod_values is None:
-            lod_values = self._lod_box_values()
-
-        if refresh_type < 4 and repre_values is None:
+        if asset_ok and subset_ok:
             repre_values = sorted(self._representations_box_values())
+            if not repre_values:
+                subset_ok = False
+            else:
+                repre_ok = self._is_repre_ok(
+                    selected_asset,
+                    selected_subset,
+                    selected_repre,
+                    repre_values
+                )
+
+        if not asset_ok:
+            subset_values = list()
+            repre_values = list()
+        elif not subset_ok:
+            repre_values = list()
 
         # Fill comboboxes with values
         self._fill_comboboxes(
-            (asset_values, subset_values, lod_values, repre_values),
-            (selected_asset, selected_subset, selected_lod, selected_repre)
+            (asset_values, subset_values, repre_values),
+            (selected_asset, selected_subset, selected_repre)
         )
-
-        self._lod_label.setVisible(self.is_lod)
-        self._lods_box.setVisible(self.is_lod)
 
         self.set_labels()
-        self.validate()
+        self.apply_validations(asset_ok, subset_ok, repre_ok)
+
+        self.fill_check = True
 
     def _fill_comboboxes(self, values, selections):
-        asset_values, subset_values, lod_values, repre_values = values
-        selected_asset, selected_subset, selected_lod, selected_repre = (
+        asset_values, subset_values, repre_values = values
+        selected_asset, selected_subset, selected_repre = (
             selections
         )
-        # Fill comboboxes
-        self.fill_check = False
-
         # Fill assets
         if asset_values is not None:
             self._assets_box.populate(asset_values)
@@ -892,24 +886,12 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 if index is not None:
                     self._subsets_box.setCurrentIndex(index)
 
-        # Fill Lod combobox
-        if lod_values is not None:
-            self._lods_box.populate(lod_values)
-            if selected_lod and selected_lod in lod_values:
-                index = None
-                for idx in range(self._lods_box.count()):
-                    if selected_lod == str(self._lods_box.itemText(idx)):
-                        index = idx
-                        break
-                if index is not None:
-                    self._lods_box.setCurrentIndex(index)
-
         if repre_values is not None:
             self._representations_box.populate(repre_values)
-            if selected_repre and selected_repre in lod_values:
+            if selected_repre and selected_repre in repre_values:
                 index = None
                 for idx in range(self._representations_box.count()):
-                    if selected_lod == str(
+                    if selected_repre == str(
                         self._representations_box.itemText(idx)
                     ):
                         index = idx
@@ -917,390 +899,33 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 if index is not None:
                     self._representations_box.setCurrentIndex(index)
 
-        self.fill_check = True
+    def set_labels(
+        self, asset_label=None, subset_label=None, repre_label=None
+    ):
+        if asset_label is None:
+            asset_label = self._assets_box.get_valid_value()
 
-    def _compute_is_lod(self):
-        selected_asset = self._assets_box.get_valid_value()
-        selected_subset = self._assets_box.get_valid_value()
+        if subset_label is None:
+            subset_label = self._subsets_box.get_valid_value()
 
-        # Return false if there are missing assets and asset is not selected
-        if (
-            selected_asset is None
-            and (self.missing_docs or self.archived_assets)
-        ):
-            return False
+        if repre_label is None:
+            repre_label = self._representations_box.get_valid_value()
 
-        # If subset is selected
-        if selected_subset:
-            # Is lod when selected value ends on LOD_MARK `(Lods)`
-            if selected_subset.endswith(self.LOD_MARK):
-                return True
-            return False
-
-        # Care only about asset if asset is selected
-        if selected_asset:
-            asset = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            for subset in io.find({"parent": asset["_id"]}):
-                # If had at least one LOD subset
-                if re.search(self.LOD_REGEX, subset["name"]):
-                    return True
-            return False
-
-        # If subset and asset are not selected
-        subset_parents = []
-        processed_parents = []
-        for subset in self.content_subsets.values():
-            parent_id = subset["parent"]
-            if parent_id not in processed_parents:
-                processed_parents.append(parent_id)
-                if not re.search(self.LOD_REGEX, subset["name"]):
-                    subset_parents.append(parent_id)
-
-        if not subset_parents:
-            return True
-
-        interest_subsets = io.find({
-            "type": "subset",
-            "parnet": {"$in": subset_parents}
-        })
-
-        interest_subsets_by_parent = collections.defaultdict(list)
-        for subset in interest_subsets:
-            interest_subsets_by_parent[subset["parent"]].append(subset)
-
-        for subset in self.content_subsets.values():
-            same_parent_subsets = interest_subsets_by_parent[subset["parent"]]
-            # check if exists lod subset with same name
-            lod_subsets = []
-            for _subset in same_parent_subsets:
-                if _subset["_id"] == subset["_id"]:
-                    continue
-                name = _subset["name"]
-                if not name.startswith(subset["name"]):
-                    continue
-                lod_regex_result = re.search(self.LOD_REGEX, name)
-                if lod_regex_result:
-                    lod_subsets.append(name)
-            if not lod_subsets:
-                return False
-        return True
-
-    def _lod_box_values(self):
-        if not self.is_lod:
-            return list()
-
-        selected_asset = self._assets_box.get_valid_value()
-        selected_subset = self._subsets_box.get_valid_value()
-
-        if selected_asset and selected_subset:
-            subset_part = selected_subset.replace(self.LOD_MARK, "")
-            asset = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            subsets = io.find({
-                "type": "subset",
-                "parent": asset["_id"]
-            })
-
-            lods = set()
-            for subset in subsets:
-                if not subset["name"].startswith(subset_part):
-                    continue
-                lod_regex_result = re.search(self.LOD_REGEX, subset["name"])
-                if lod_regex_result:
-                    lods.add(lod_regex_result.group(0).replace(
-                        self.LOD_SPLITTER, ""
-                    ))
-            return sorted(list(lods))
-
-        if selected_asset:
-            asset = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            subsets = io.find({
-                "type": "subset",
-                "parent": asset["_id"]
-            })
-            subset_names, groups = self._group_lods(
-                sorted(subsets.distinct("name"))
-            )
-            lods = None
-            for _lods in groups.values():
-                sub_lods = set(lod for lod in _lods)
-                if lods is None:
-                    lods = sub_lods
-                else:
-                    lods = (lods & sub_lods)
-            return sorted(list(lods))
-
-        asset_ids = list(self.content_assets.keys())
-        subsets_of_context_assets = io.find({
-            "type": "subset",
-            "parent": {"$in": asset_ids}
-        })
-
-        subsets_by_parent_id = collections.defaultdict(list)
-
-        if selected_subset:
-            subset_part = selected_subset.replace(self.LOD_MARK, "")
-            for subset in subsets_of_context_assets:
-                if subset["name"].startswith(subset_part):
-                    subsets_by_parent_id[subset["parent"]].append(subset)
-
-        else:
-            for subset in subsets_of_context_assets:
-                subsets_by_parent_id[subset["parent"]].append(subset)
-
-        if not subsets_by_parent_id:
-            return list()
-
-        lods = None
-        for subsets in subsets_by_parent_id.values():
-            item_lods = set()
-            for subset in subsets:
-                lod_regex_result = re.search(self.LOD_REGEX, subset["name"])
-                if lod_regex_result:
-                    item_lods.add(lod_regex_result.group(0).replace(
-                        self.LOD_SPLITTER, ""
-                    ))
-
-            if lods is None:
-                lods = item_lods
-            else:
-                lods = (lods & item_lods)
-
-            # Skip next processing if set is already empty
-            if not lods:
-                return list()
-
-        return sorted(list(lods))
-
-    def set_labels(self):
         default = "*No changes"
-        asset_label = default
-        subset_label = default
-        lod_label = default
-        repre_label = default
+        self._asset_label.setText(asset_label or default)
+        self._subset_label.setText(subset_label or default)
+        self._repre_label.setText(repre_label or default)
 
-        if self._assets_box.currentText() != "":
-            asset_label = self._assets_box.currentText()
-        if self._subsets_box.currentText() != "":
-            subset_label = self._subsets_box.currentText()
-        if self._lods_box.currentText() != "":
-            lod_label = self._lods_box.currentText()
-        if self._representations_box.currentText() != "":
-            repre_label = self._representations_box.currentText()
-
-        self._asset_label.setText(asset_label)
-        self._subset_label.setText(subset_label)
-        self._lod_label.setText(lod_label)
-        self._repre_label.setText(repre_label)
-
-    def validate(self):
-        _asset_name = self._assets_box.get_valid_value()
-        _subset_name = self._subsets_box.get_valid_value()
-        _lod_name = self._lods_box.get_valid_value()
-        _repre_name = self._representations_box.get_valid_value()
-
-        asset_ok = True
-        subset_ok = True
-        lod_ok = True
-        repre_ok = True
-        # TODO effective way
-        for item in self._items:
-            _id = io.ObjectId(item["representation"])
-            representation = io.find_one({
-                "type": "representation",
-                "_id": _id
-            })
-            ver, subset, asset, proj = io.parenthood(representation)
-
-            asset_name = _asset_name
-            subset_name = _subset_name
-            lod_name = _lod_name
-            repre_name = _repre_name
-
-            if asset_name is None:
-                asset_name = asset["name"]
-
-            # asset check
-            asset = io.find_one({
-                "name": asset_name,
-                "type": "asset"
-            })
-
-            if asset is None:
-                asset_ok = False
-                continue
-
-            if repre_name is None:
-                repre_name = representation["name"]
-
-            if self.is_lod and self._lods_box.isVisible():
-                subsets = io.find({
-                    "type": "subset",
-                    "parent": asset["_id"]
-                })
-
-                if subset_name is None and lod_name is None:
-                    subset_name = subset["name"]
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, subset_name
-                    )
-                    subset = io.find_one({
-                        "name": subset_name,
-                        "type": "subset",
-                        "parent": asset["_id"]
-                    })
-                    if not lod_regex_result:
-                        subset_ok = False
-                        continue
-                    elif subset is None:
-                        lod_part = lod_regex_result.group(1)
-                        subset_part = subset_name.replace(
-                            lod_regex_result.group(0), ""
-                        )
-                        _sub_ok = False
-                        for subset in subsets:
-                            if subset["name"].startswith(subset_part):
-                                _sub_ok = True
-                                break
-                        if subset_ok:
-                            subset_ok = _sub_ok
-                        if lod_ok:
-                            lod_ok = not _sub_ok
-                        continue
-
-                elif subset_name is None:
-                    subset_name = subset["name"]
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, subset_name
-                    )
-                    if not lod_regex_result:
-                        subset_ok = False
-                        continue
-                    subset_name = subset_name.replace(
-                        lod_regex_result.group(0),
-                        (self.LOD_SPLITTER + lod_name)
-                    )
-                    subset = io.find_one({
-                        "name": subset_name,
-                        "type": "subset",
-                        "parent": asset["_id"]
-                    })
-                    if subset is None:
-                        subset_ok = False
-                        continue
-
-                elif lod_name is None:
-                    orig_subset_name = subset["name"]
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, orig_subset_name
-                    )
-                    if not lod_regex_result:
-                        lod_ok = False
-                        continue
-                    subset_name = subset_name.replace(self.LOD_MARK, "")
-                    subset_name += (
-                        lod_regex_result.group(0)
-                    )
-                    subset = io.find_one({
-                        "name": subset_name,
-                        "type": "subset",
-                        "parent": asset["_id"]
-                    })
-                    if subset is None:
-                        lod_ok = False
-                        continue
-                else:
-                    orig_subset_name = subset["name"]
-                    subset_name = subset_name.replace(self.LOD_MARK, "")
-                    subset_name += self.LOD_SPLITTER + lod_name
-                    subset = io.find_one({
-                        "name": subset_name,
-                        "type": "subset",
-                        "parent": asset["_id"]
-                    })
-
-                    # This should never happen
-                    if subset is None:
-                        lod_regex_result = re.search(
-                            self.LOD_REGEX, orig_subset_name
-                        )
-                        lod_part = lod_regex_result.group(1)
-                        subset_part = subset_name.replace(
-                            lod_regex_result.group(0), ""
-                        )
-                        _sub_ok = False
-                        for subset in subsets:
-                            if subset["name"].startswith(subset_part):
-                                _sub_ok = True
-                                break
-                        if _sub_ok and self._lods_box.count() == 0:
-                            _sub_ok = False
-                        if subset_ok:
-                            subset_ok = _sub_ok
-                        if lod_ok:
-                            lod_ok = not _sub_ok
-                        continue
-
-            else:
-                if subset_name is None:
-                    subset_name = subset["name"]
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, subset["name"]
-                    )
-                    if lod_regex_result and _asset_name is not None:
-                        subset_name = subset_name.replace(
-                            lod_regex_result.group(0), ""
-                        )
-                else:
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, subset["name"]
-                    )
-                    if lod_regex_result and _asset_name is None:
-                        subset_name += lod_regex_result.group(0)
-
-                subset = io.find_one({
-                    "name": subset_name,
-                    "type": "subset",
-                    "parent": asset["_id"]
-                })
-                if subset is None:
-                    subset_ok = False
-                    continue
-
-            version = io.find_one(
-                {
-                    "type": "version",
-                    "parent": subset["_id"]
-                },
-                sort=[("name", -1)]
-            )
-            if version is None:
-                repre_ok = False
-                continue
-
-            repre = io.find_one({
-                "name": repre_name,
-                "type": "representation",
-                "parent": version["_id"]
-            })
-            if repre is None:
-                repre_ok = False
-                continue
-
+    def apply_validations(self, asset_ok, subset_ok, repre_ok):
         error_msg = "*Please select"
         error_sheet = "border: 1px solid red;"
         success_sheet = "border: 1px solid green;"
-        asset_sheet = subset_sheet = repre_sheet = lod_sheet = ""
-        accept_sheet = ""
-        all_ok = asset_ok and subset_ok and lod_ok and repre_ok
+
+        asset_sheet = None
+        subset_sheet = None
+        repre_sheet = None
+        accept_sheet = None
+        all_ok = asset_ok and subset_ok and repre_ok
 
         if asset_ok is False:
             asset_sheet = error_sheet
@@ -1308,500 +933,289 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         if subset_ok is False:
             subset_sheet = error_sheet
             self._subset_label.setText(error_msg)
-        if lod_ok is False:
-            lod_sheet = error_sheet
-            self._lod_label.setText(error_msg)
         if repre_ok is False:
             repre_sheet = error_sheet
             self._repre_label.setText(error_msg)
         if all_ok:
             accept_sheet = success_sheet
 
-        self._assets_box.setStyleSheet(asset_sheet)
-        self._subsets_box.setStyleSheet(subset_sheet)
-        self._lods_box.setStyleSheet(lod_sheet)
-        self._representations_box.setStyleSheet(repre_sheet)
+        self._assets_box.setStyleSheet(asset_sheet or "")
+        self._subsets_box.setStyleSheet(subset_sheet or "")
+        self._representations_box.setStyleSheet(repre_sheet or "")
 
         self._accept_btn.setEnabled(all_ok)
-        self._accept_btn.setStyleSheet(accept_sheet)
+        self._accept_btn.setStyleSheet(accept_sheet or "")
 
-    def _get_assets(self):
-        filtered_assets = []
+    def _get_asset_box_values(self):
         assets_by_id = {
-            asset["_id"]: asset
-            for asset in io.find({"type": "asset"})
+            asset_doc["_id"]: asset_doc
+            for asset_doc in io.find({"type": "asset"})
         }
         subsets = io.find({
             "type": "subset",
             "parent": {"$in": list(assets_by_id.keys())}
         })
+
+        filtered_assets = []
         for subset in subsets:
             asset_name = assets_by_id[subset["parent"]]["name"]
             if asset_name not in filtered_assets:
                 filtered_assets.append(asset_name)
+        return sorted(filtered_assets)
 
-        return filtered_assets
-
-    def _get_subsets(self):
+    def _get_subset_box_values(self):
         selected_asset = self._assets_box.get_valid_value()
-        # Filter subsets by asset in dropdown
         if selected_asset:
-            asset_doc = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            return list(io.find({
-                "type": "subset",
-                "parent": asset_doc["_id"]
-            }).distinct("name"))
+            asset_doc = io.find_one({"type": "asset", "name": selected_asset})
+            asset_ids = [asset_doc["_id"]]
+        else:
+            asset_ids = list(self.content_assets.keys())
 
-        # Asset in dropdown is not selected
-        # - filter subsets by selected assets in scene inventory
-        subsets_by_parent_id = collections.defaultdict(list)
-        for subset in self.content_subsets.values():
-            subsets_by_parent_id[subset["parent"]].append(subset)
+        subsets = io.find({
+            "type": "subset",
+            "parent": {"$in": asset_ids}
+        })
+
+        subset_names_by_parent_id = collections.defaultdict(set)
+        for subset in subsets:
+            subset_names_by_parent_id[subset["parent"]].add(subset["name"])
 
         possible_subsets = None
-        for subsets in subsets_by_parent_id.values():
-            asset_subsets = set()
-            for subset in subsets:
-                subset_name = subset["name"]
-                lod_regex_result = re.search(self.LOD_REGEX, subset_name)
-                if not self.is_lod and lod_regex_result:
-                    subset_name = subset_name.replace(
-                        lod_regex_result.group(0), ""
-                    )
-                asset_subsets.add(subset_name)
-
+        for subset_names in subset_names_by_parent_id.values():
             if possible_subsets is None:
-                possible_subsets = asset_subsets
+                possible_subsets = subset_names
             else:
-                possible_subsets = (possible_subsets & asset_subsets)
+                possible_subsets = (possible_subsets & subset_names)
 
-        if possible_subsets is None:
-            return list()
-        return list(possible_subsets)
+            if not possible_subsets:
+                break
 
-    def _group_lods(self, subsets):
-        """
-        Group subset names if they contains ``_LODx`` string in list under
-        dict key with the name of group.
-
-        Example::
-            ``["A_LOD1", "A_LOD2", "B_LOD1", "B_LOD2", "C"]``
-            will became:
-            ``
-            {
-                "A(LODs)": ["LOD1", "LOD2"],
-                "B(LODs)": ["LOD1", "LOD2"]
-            }
-
-        :param subsets: List of subset names
-        :param type: list
-        :returns: dict of groups and list of all subset with group names
-        :rtype: dict, list
-        """
-        groups = collections.defaultdict(list)
-        subsets_out = []
-        for subset in subsets:
-            lod_regex_result = re.search(self.LOD_REGEX, subset)
-            if lod_regex_result:
-                # strip _LOD string from subset name
-                grp_name = re.search("(.*){}".format(
-                    lod_regex_result.group(0)), subset
-                )
-                # This formatting can't be changed!!!
-                #  - replacing on accept won't work (LOD_MARK is replaced)
-                key_name = "{}{}".format(grp_name.group(1), self.LOD_MARK)
-                # store only "LOD*number*"
-                groups[key_name].append(
-                    lod_regex_result.group(1).replace("_", "")
-                )
-                if key_name not in subsets_out:
-                    subsets_out.append(key_name)
-            elif subset not in subsets_out:
-                subsets_out.append(subset)
-
-        return subsets_out, groups
+        return list(possible_subsets or list())
 
     def _representations_box_values(self):
+        # NOTE master versions are not used because it is expected that
+        # master version has same representations as latests
         selected_asset = self._assets_box.currentText()
         selected_subset = self._subsets_box.currentText()
-        selected_lod = self._lods_box.currentText()
 
         # If nothing is selected
-        if (
-            not selected_asset
-            and not selected_subset
-            and (self.is_lod is False or not selected_lod)
-        ):
-            context_version_ids = [
-                version["_id"] for version in self.content_versions.values()
-            ]
+        if not selected_asset and not selected_subset:
+            # Find all representations of selection's subsets
             possible_repres = list(io.find({
                 "type": "representation",
-                "parent": {"$in": context_version_ids}
+                "parent": {"$in": list(self.content_versions.keys())}
             }))
-            possible_repres_by_parent = collections.defaultdict(list)
+
+            possible_repres_by_parent = collections.defaultdict(set)
             for repre in possible_repres:
-                possible_repres_by_parent[repre["parent"]].append(repre)
+                possible_repres_by_parent[repre["parent"]].add(repre["name"])
 
             output_repres = None
-            for repres in possible_repres_by_parent.values():
-                merge_repres = set()
-                for repre in repres:
-                    merge_repres.add(repre["name"])
-                if output_repres is None:
-                    output_repres = merge_repres
-                else:
-                    output_repres = (output_repres & merge_repres)
-
-            if output_repres is None:
-                return list()
-            return list(output_repres)
-
-        # If everything is selected
-        if (
-            selected_asset
-            and selected_subset
-            and (self.is_lod is False or selected_lod)
-        ):
-            asset = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            # subset
-            if self.is_lod:
-                subset_name = selected_subset.replace(self.LOD_MARK, "")
-                if selected_lod != self.LOD_NOT_LOD:
-                    subset_name = self.LOD_SPLITTER.join(
-                        (subset_name, selected_lod)
-                    )
-            else:
-                subset_name = selected_subset
-
-            subset = io.find_one({
-                "type": "subset",
-                "parent": asset["_id"],
-                "name": subset_name
-            })
-            # versions
-            versions = list(io.find({
-                "type": "version",
-                "parent": subset["_id"]
-            }, sort=[("name", 1)]))
-
-            repre_names = list()
-            if versions:
-                # representations
-                repres = io.find({
-                    "type": "representation",
-                    "parent": versions[-1]["_id"]
-                })
-                for repre in repres:
-                    repre_names.append(repre["name"])
-            return repre_names
-
-        # Rest of If asset is selected
-        if selected_asset:
-            # if is LOD and (subset or lod) are selected
-            asset = io.find_one({
-                "type": "asset",
-                "name": selected_asset
-            })
-            subsets = io.find({
-                "type": "subset",
-                "parent": asset["_id"]
-            })
-
-            if self.is_lod and (selected_subset or selected_lod):
-                possible_subsets = []
-                if selected_subset:
-                    subset_name = selected_subset.replace(self.LOD_MARK, "")
-                    for subset in subsets:
-                        if subset["name"].startswith(subset_name):
-                            possible_subsets.append(subset)
-
-                elif selected_lod == self.LOD_NOT_LOD:
-                    for subset in subsets:
-                        if not re.search(self.LOD_REGEX, subset["name"]):
-                            possible_subsets.append(subset)
-
-                else:
-                    for subset in subsets:
-                        if subset["name"].endswith(selected_lod):
-                            possible_subsets.append(subset)
-
-            else:
-                possible_subsets = subsets
-
-            # versions
-            subset_ids = [subset["_id"] for subset in possible_subsets]
-            versions = list(io.find({
-                "type": "version",
-                "parent": {"$in": subset_ids}
-            }, sort=[("name", 1)]))
-
-            higher_versions_map = {}
-            for version in versions:
-                parent_id = version["parent"]
-                if parent_id not in higher_versions_map:
-                    higher_versions_map[parent_id] = version
-
-            higher_versions_ids = [
-                version["_id"]
-                for version in higher_versions_map.values()
-            ]
-
-            higher_version_repres = io.find({
-                "type": "representation",
-                "parent": {"$in": higher_versions_ids}
-            })
-
-            repre_per_version = collections.defaultdict(set)
-            for repre in higher_version_repres:
-                repre_per_version[repre["parent"]].add(repre["name"])
-
-            # representations
-            output_repres = None
-            for repre_names in repre_per_version.values():
+            for repre_names in possible_repres_by_parent.values():
                 if output_repres is None:
                     output_repres = repre_names
                 else:
                     output_repres = (output_repres & repre_names)
 
-            if output_repres is None:
-                return list()
-            return list(output_repres)
+                if not output_repres:
+                    break
 
-        # if asset is not selected and lod is selected
-        if self.is_lod and selected_lod:
-            # TODO effective way
-            output_repres = set()
-            for item in self._items:
-                _id = io.ObjectId(item["representation"])
-                representation = io.find_one({
-                    "type": "representation",
-                    "_id": _id
-                })
-                ver, subs, asset, proj = io.parenthood(representation)
-                subset_name = self._strip_lod(subs["name"])
-                if selected_lod != self.LOD_NOT_LOD:
-                    subset_name = self.LOD_SPLITTER.join(
-                        (subset_name, selected_lod)
-                    )
+            return list(output_repres or list())
 
-                subsets = io.find({
-                    "type": "subset",
-                    "parent": asset["_id"],
-                    "name": subset_name
-                })
-
-                versions = []
-                for subset in subsets:
-                    _versions = io.find({
-                        "type": "version",
-                        "parent": subset["_id"]
-                    }, sort=[("name", 1)])
-                    _versions = [version for version in _versions]
-                    if len(_versions) == 0:
-                        continue
-                    versions.append(_versions[-1])
-
-                if len(versions) == 0:
-                    return list(output_repres)
-
-                for version in versions:
-                    repres = io.find({
-                        "type": "representation",
-                        "parent": version["_id"]
-                    }).distinct("name")
-                    repre_names = set(repres)
-                    if output_repres:
-                        output_repres = (output_repres & repre_names)
-                    else:
-                        output_repres = repre_names
-            return list(output_repres)
-
-        # if asset is not selected
-        if self.is_lod:
-            subset_text = selected_subset.replace(self.LOD_MARK, "")
+        if selected_asset:
+            # If asset only is selected
+            asset = io.find_one({"type": "asset", "name": selected_asset})
+            asset_ids = [asset["_id"]]
         else:
-            subset_text = selected_subset
+            # If only subset is selected
+            asset_ids = list(self.content_assets.keys())
 
-        subset_names_by_asset_id = collections.defaultdict(list)
-        for subset in self.content_subsets.values():
-            lod_regex_result = re.search(self.LOD_REGEX, subset["name"])
-            if lod_regex_result:
-                subset_name = subset_text + lod_regex_result.group(0)
-            else:
-                subset_name = subset_text
+        subset_query = {
+            "type": "subset",
+            "parent": {"$in": asset_ids}
+        }
+        if selected_subset:
+            subset_query["name"] = selected_subset
 
-            subset_names_by_asset_id[subset["parent"]].append(subset_name)
+        subsets = list(io.find(subset_query))
+        if not subsets:
+            return list()
 
-        # TODO effective way
-        query = {"$or": []}
-        for asset_id, subset_names in subset_names_by_asset_id.items():
-            query["$or"].append({
-                "type": "subset",
-                "parent": asset_id,
-                "name": {"$in": subset_names}
-            })
-
-        subsets = io.find(query)
-
-        subset_ids = [subset["_id"] for subset in subsets]
-        versions = io.find({
+        # versions
+        versions = list(io.find({
             "type": "version",
-            "parent": {"$in": subset_ids}
-        }, sort=[("name", 1)])
+            "parent": {"$in": [subset["_id"] for subset in subsets]}
+        }, sort=[("name", -1)]))
+        if not versions:
+            return list()
 
-        latest_versions_by_parent = {}
+        higher_versions_map = {}
         for version in versions:
             parent_id = version["parent"]
-            if parent_id not in latest_versions_by_parent:
-                latest_versions_by_parent[parent_id] = version
+            if parent_id not in higher_versions_map:
+                higher_versions_map[parent_id] = version
 
-        latest_version_ids = [
-            version["_id"]
-            for version in latest_versions_by_parent.values()
+        higher_versions_ids = [
+            version["_id"] for version in higher_versions_map.values()
         ]
-        latest_representations = io.find({
+
+        higher_version_repres = io.find({
             "type": "representation",
-            "parent": {"$in": latest_version_ids}
+            "parent": {"$in": higher_versions_ids}
         })
 
-        repres_by_parent = collections.defaultdict(set)
-        for repre in latest_representations:
-            repres_by_parent[repre["parent"]].add(repre["name"])
+        repre_per_version = collections.defaultdict(set)
+        for repre in higher_version_repres:
+            repre_per_version[repre["parent"]].add(repre["name"])
 
+        # representations
         output_repres = None
-        for repre_names in repres_by_parent.values():
+        for repre_names in repre_per_version.values():
             if output_repres is None:
                 output_repres = repre_names
             else:
                 output_repres = (output_repres & repre_names)
 
-        if output_repres is None:
-            return list()
-        return list(output_repres)
+            if not output_repres:
+                break
+
+        return list(output_repres or list())
+
+    def _is_asset_ok(self, selected_asset):
+        if (
+            selected_asset is None
+            and (self.missing_docs or self.archived_assets)
+        ):
+            return False
+        return True
+
+    def _is_subset_ok(self, selected_asset, selected_subset, subset_values):
+        # If subset is selected then must be ok
+        if selected_subset is not None:
+            return True
+
+        if self.missing_docs:
+            return False
+
+        if self.archived_subsets:
+            if selected_asset is None:
+                return False
+
+            asset_doc = io.find_one({
+                "type": "asset",
+                "name": selected_asset
+            })
+            subset_docs = io.find({
+                "type": "subset",
+                "parent": asset_doc["_id"]
+            })
+            for subset in subset_docs:
+                if subset["name"] not in subset_values:
+                    return False
+        return True
+
+    def _is_repre_ok(
+        self, selected_asset, selected_subset, selected_repre, repre_values
+    ):
+        # If subset is selected then must be ok
+        if selected_repre is not None:
+            return True
+
+        if self.missing_docs:
+            return False
+
+        if selected_asset is None and selected_subset is None:
+            if self.archived_repres:
+                return False
+            return True
+
+        if selected_asset:
+            asset_doc = io.find_one({"type": "asset", "name": selected_asset})
+            asset_ids = [asset_doc["_id"]]
+        else:
+            asset_ids = list(self.content_assets.keys())
+
+        subset_query = {
+            "type": "subset",
+            "parent": {"$in": asset_ids}
+        }
+        if selected_subset:
+            subset_query["name"] = selected_subset
+
+        subset_docs = list(io.find(subset_query))
+        if not subset_docs:
+            return False
+
+        subsets_by_id = {
+            subset["_id"]: subset
+            for subset in subset_docs
+        }
+
+        versions = io.find({
+            "type": "version",
+            "parent": {"$in": [subset["_id"] for subset in subset_docs]}
+        }, sort=[("name", -1)])
+
+        highest_version_mapping = {}
+        for version in versions:
+            subset_id = version["parent"]
+            if subset_id not in highest_version_mapping:
+                highest_version_mapping[subset_id] = version
+
+        higher_versions_by_id = {
+            version["_id"]: version
+            for version in highest_version_mapping.values()
+        }
+        repre_docs = io.find({
+            "type": "representation",
+            "parent": {"$in": list(higher_versions_by_id.keys())}
+        })
+
+        hierarchy = collections.defaultdict(list)
+        for repre_doc in repre_docs:
+            version_doc = higher_versions_by_id[repre_doc["parent"]]
+            subset_doc = subsets_by_id[version_doc["parent"]]
+            hierarchy[subset_doc["name"]].append(repre_doc["name"])
+
+        for repre_doc in self.content_repres.values():
+            version_doc = self.content_versions[repre_doc["parent"]]
+            subset_doc = self.content_subsets[version_doc["parent"]]
+            subset_name = subset_doc["name"]
+
+            repre_names = hierarchy.get(subset_name) or []
+            if repre_doc["name"] not in repre_names:
+                return False
+        return True
 
     def _on_accept(self):
         # Use None when not a valid value or when placeholder value
-        _asset = self._assets_box.get_valid_value()
-        _subset = self._subsets_box.get_valid_value()
-        _lod = self._lods_box.get_valid_value()
-        _representation = self._representations_box.get_valid_value()
-        if self.is_lod:
-            if not any([_asset, _subset, _lod, _representation]):
-                self.log.error("Nothing selected")
-                return
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._subsets_box.get_valid_value()
+        selected_representation = self._representations_box.get_valid_value()
+        if not any([selected_asset, selected_subset, selected_representation]):
+            self.log.error("Nothing selected")
+            return
 
-            for item in self._items:
-                _asset_name = _asset
-                _subset_name = _subset
-                _lod_name = _lod
-                _representation_name = _representation
-
-                repre = self.content_repres[
-                    io.ObjectId(item["representation"])
-                ]
-                version = self.content_versions[repre["parent"]]
-                subset = self.content_subsets[version["parent"]]
-                if _subset_name is not None and _lod_name is not None:
-                    _subset_name = self.LOD_SPLITTER.join([
-                        _subset_name.replace(self.LOD_MARK, ""),
-                        _lod_name
-                    ])
-                elif _subset_name is not None and self._lods_box.isVisible():
-                    subset_name = subset["name"]
-                    lod_regex_result = re.search(self.LOD_REGEX, subset_name)
-                    _lod_name = lod_regex_result.group(0)
-                    _subset_name = self.LOD_SPLITTER.join([
-                        _subset_name, _lod_name
-                    ])
-
-                elif _lod_name is not None:
-                    subset_name = subset["name"]
-                    lod_regex_result = re.search(self.LOD_REGEX, subset_name)
-                    if lod_regex_result:
-                        subset_name = subset_name.replace(
-                            lod_regex_result.group(0), ""
-                        )
-                    _subset_name = self.LOD_SPLITTER.join([
-                        subset_name, _lod_name
-                    ])
-
-                try:
-                    switch_item(
-                        item,
-                        asset_name=_asset_name,
-                        subset_name=_subset_name,
-                        representation_name=_representation_name
-                    )
-                except Exception:
-                    self.log.warning(
-                        (
-                            "Couldn't switch asset."
-                            "See traceback for more information."
-                        ),
-                        exc_info=True
-                    )
-        else:
-            if not any([_asset, _subset, _representation]):
-                self.log.error("Nothing selected")
-                return
-
-            for item in self._items:
-                _asset_name = _asset
-                _subset_name = _subset
-                _representation_name = _representation
-
-                repre = self.content_repres[
-                    io.ObjectId(item["representation"])
-                ]
-                subset = self.content_subsets[repre["parent"]]
-                if _subset_name is not None and _asset_name is None:
-                    lod_regex_result = re.search(
-                        self.LOD_REGEX, subset["name"]
-                    )
-                    if lod_regex_result:
-                        lod = lod_regex_result.group(0)
-                        _subset_name += lod
-
-                try:
-                    switch_item(
-                        item,
-                        asset_name=_asset_name,
-                        subset_name=_subset_name,
-                        representation_name=_representation_name
-                    )
-                except Exception:
-                    self.log.warning(
-                        (
-                            "Couldn't switch asset."
-                            "See traceback for more information."
-                        ),
-                        exc_info=True
-                    )
+        for item in self._items:
+            try:
+                switch_item(
+                    item,
+                    asset_name=selected_asset,
+                    subset_name=selected_subset,
+                    representation_name=selected_representation
+                )
+            except Exception:
+                self.log.warning(
+                    (
+                        "Couldn't switch asset."
+                        "See traceback for more information."
+                    ),
+                    exc_info=True
+                )
 
         self.switched.emit()
 
         self.close()
-
-    def _strip_lod(self, subset):
-        """
-        Strip _LODx string from subset name or return subset name unmodified.
-        :param subset: subset name
-        :type subset: str
-        :returns: subset name
-        :rtype: str
-        """
-        matched = re.search(self.LOD_REGEX, subset)
-        if matched:
-            grp_name = re.search("(.*){}".format(matched.group(0)), subset)
-            return grp_name.group(1)
-        return subset
 
 
 class Window(QtWidgets.QDialog):
