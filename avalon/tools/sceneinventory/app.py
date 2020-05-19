@@ -809,34 +809,27 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         if refresh_type < 1:
             asset_values = self._get_asset_box_values()
+            self._fill_combobox(asset_values, "asset")
 
         # Set other comboboxes to empty if any document is missing or any asset
         # of loaded representations is archived.
-        selected_asset = self._assets_box.get_valid_value()
-        selected_subset = self._subsets_box.get_valid_value()
-        selected_repre = self._representations_box.get_valid_value()
-        asset_ok = self._is_asset_ok(selected_asset)
+        asset_ok = self._is_asset_ok()
 
         if asset_ok:
             subset_values = self._get_subset_box_values()
+            self._fill_combobox(subset_values, "subset")
             if not subset_values:
                 asset_ok = False
             else:
-                subset_ok = self._is_subset_ok(
-                    selected_asset, selected_subset, subset_values
-                )
+                subset_ok = self._is_subset_ok(subset_values)
 
         if asset_ok and subset_ok:
             repre_values = sorted(self._representations_box_values())
+            self._fill_combobox(repre_values, "repre")
             if not repre_values:
                 subset_ok = False
             else:
-                repre_ok = self._is_repre_ok(
-                    selected_asset,
-                    selected_subset,
-                    selected_repre,
-                    repre_values
-                )
+                repre_ok = self._is_repre_ok(repre_values)
 
         if not asset_ok:
             subset_values = list()
@@ -846,10 +839,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         # Fill comboboxes with values
         loaders = self._loaders(asset_ok, subset_ok, repre_ok)
-        self._fill_comboboxes(
-            (asset_values, subset_values, repre_values),
-            (selected_asset, selected_subset, selected_repre)
-        )
         self.set_labels()
         self.apply_validations(asset_ok, subset_ok, repre_ok, bool(loaders))
         self._build_loader_menu(loaders)
@@ -982,48 +971,28 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
                 menu.addAction(action)
 
-    def _fill_comboboxes(self, values, selections):
-        asset_values, subset_values, repre_values = values
-        selected_asset, selected_subset, selected_repre = (
-            selections
-        )
-        # Fill assets
-        if asset_values is not None:
-            self._assets_box.populate(asset_values)
-            if selected_asset and selected_asset in asset_values:
-                index = None
-                for idx in range(self._subsets_box.count()):
-                    if selected_asset == str(self._assets_box.itemText(idx)):
-                        index = idx
-                        break
-                if index is not None:
-                    self._assets_box.setCurrentIndex(index)
+    def _fill_combobox(self, values, combobox_type):
+        if combobox_type == "asset":
+            combobox_widget = self._assets_box
+        elif combobox_type == "subset":
+            combobox_widget = self._subsets_box
+        elif combobox_type == "repre":
+            combobox_widget = self._representations_box
+        else:
+            return
+        selected_value = combobox_widget.get_valid_value()
 
-        # Fill subsets
-        if subset_values is not None:
-            self._subsets_box.populate(subset_values)
-            # Keep same selection if possible
-            if selected_subset and selected_subset in subset_values:
+        # Fill combobox
+        if values is not None:
+            combobox_widget.populate(values)
+            if selected_value and selected_value in values:
                 index = None
-                for idx in range(self._subsets_box.count()):
-                    if selected_subset == str(self._subsets_box.itemText(idx)):
+                for idx in range(combobox_widget.count()):
+                    if selected_value == str(combobox_widget.itemText(idx)):
                         index = idx
                         break
                 if index is not None:
-                    self._subsets_box.setCurrentIndex(index)
-
-        if repre_values is not None:
-            self._representations_box.populate(repre_values)
-            if selected_repre and selected_repre in repre_values:
-                index = None
-                for idx in range(self._representations_box.count()):
-                    if selected_repre == str(
-                        self._representations_box.itemText(idx)
-                    ):
-                        index = idx
-                        break
-                if index is not None:
-                    self._representations_box.setCurrentIndex(index)
+                    combobox_widget.setCurrentIndex(index)
 
     def set_labels(self):
         asset_label = self._assets_box.get_valid_value()
@@ -1049,12 +1018,13 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         if asset_ok is False:
             asset_sheet = error_sheet
             self._asset_label.setText(error_msg)
-        if subset_ok is False:
+        elif subset_ok is False:
             subset_sheet = error_sheet
             self._subset_label.setText(error_msg)
-        if repre_ok is False or loaders_ok is False:
+        elif repre_ok is False or loaders_ok is False:
             repre_sheet = error_sheet
             self._repre_label.setText(error_msg)
+
         if all_ok:
             accept_sheet = success_sheet
 
@@ -1200,7 +1170,8 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         return list(output_repres or list())
 
-    def _is_asset_ok(self, selected_asset):
+    def _is_asset_ok(self):
+        selected_asset = self._assets_box.get_valid_value()
         if (
             selected_asset is None
             and (self.missing_docs or self.archived_assets)
@@ -1208,7 +1179,10 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             return False
         return True
 
-    def _is_subset_ok(self, selected_asset, selected_subset, subset_values):
+    def _is_subset_ok(self, subset_values):
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._subsets_box.get_valid_value()
+
         # If subset is selected then must be ok
         if selected_subset is not None:
             return True
@@ -1233,9 +1207,11 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     return False
         return True
 
-    def _is_repre_ok(
-        self, selected_asset, selected_subset, selected_repre, repre_values
-    ):
+    def _is_repre_ok(self, repre_values):
+        selected_asset = self._assets_box.get_valid_value()
+        selected_subset = self._subsets_box.get_valid_value()
+        selected_repre = self._representations_box.get_valid_value()
+
         # If subset is selected then must be ok
         if selected_repre is not None:
             return True
@@ -1295,6 +1271,22 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             version_doc = higher_versions_by_id[repre_doc["parent"]]
             subset_doc = subsets_by_id[version_doc["parent"]]
             hierarchy[subset_doc["name"]].append(repre_doc["name"])
+
+        content_repre_names = set()
+        for repre_doc in self.content_repres.values():
+            content_repre_names.add(repre_doc["name"])
+
+        if selected_subset:
+            subset_repre_names = hierarchy.get(selected_subset)
+            if not subset_repre_names:
+                return False
+            for repre_name in content_repre_names:
+                if repre_name not in subset_repre_names:
+                    return False
+            return True
+
+        if selected_asset:
+            return True
 
         for repre_doc in self.content_repres.values():
             version_doc = self.content_versions[repre_doc["parent"]]
