@@ -1238,7 +1238,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         for version_doc in version_docs:
             parent_id = version_doc["parent"]
             if parent_id not in version_docs_by_parent_id:
-                version_ids.append(version_doc)
+                version_ids.append(version_doc["_id"])
                 version_docs_by_parent_id[parent_id] = version_doc
 
         master_version_docs_by_parent_id = {}
