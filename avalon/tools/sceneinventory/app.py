@@ -838,20 +838,37 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             repre_values = list()
 
         # Fill comboboxes with values
-        loaders = self._loaders(asset_ok, subset_ok, repre_ok)
+        loaders = self.prepare_loaders(asset_ok, subset_ok, repre_ok)
         self.set_labels()
         self.apply_validations(asset_ok, subset_ok, repre_ok, bool(loaders))
         self._build_loader_menu(loaders)
 
         self.fill_check = True
 
-    def _loaders(self, asset_ok, subset_ok, repre_ok):
+    def prepare_loaders(self, asset_ok, subset_ok, repre_ok):
         if not all((asset_ok, subset_ok, repre_ok)):
             return list()
 
+        repres = self.repres_for_loaders_filter()
+        return self._get_loaders(repres)
+
+    def repres_for_loaders_filter(self):
         selected_asset = self._assets_box.get_valid_value()
         selected_subset = self._subsets_box.get_valid_value()
         selected_repre = self._representations_box.get_valid_value()
+        if (
+            selected_asset is None
+            and selected_subset is None
+            and selected_repre is None
+        ):
+            return list(self.content_repres.values())
+
+        if selected_asset is None and selected_subset is None:
+            repres = []
+            for repre in self.content_repres.values():
+                if repre["name"] == selected_repre:
+                    repres.append(repre)
+            return repres
 
         if selected_asset:
             asset_doc = io.find_one({"type": "asset", "name": selected_asset})
@@ -911,8 +928,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         ready_repres = list()
         for repre_name in possible_repre_names or list():
             ready_repres.extend(repres_by_name[repre_name])
-
-        return self._get_loaders(ready_repres)
+        return ready_repres
 
     def _get_loaders(self, representations):
         if not representations:
