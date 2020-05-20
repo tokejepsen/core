@@ -1331,7 +1331,7 @@ def update(container, version=-1):
     return loader.update(container, new_representation)
 
 
-def switch(container, representation, Loader=None):
+def switch(container, representation):
     """Switch a container to representation
 
     Args:
@@ -1343,8 +1343,7 @@ def switch(container, representation, Loader=None):
     """
 
     # Get the Loader for this container
-    if Loader is None:
-        Loader = _get_container_loader(container)
+    Loader = _get_container_loader(container)
 
     if not Loader:
         raise RuntimeError("Can't switch container. See log for details.")

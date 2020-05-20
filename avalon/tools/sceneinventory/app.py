@@ -14,7 +14,6 @@ from ..delegates import VersionDelegate
 
 from .proxy import FilterProxyModel
 from .model import InventoryModel
-from .lib import switch_item
 
 DEFAULT_COLOR = "#fb9c15"
 
@@ -642,8 +641,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         accept_btn.setIcon(accept_icon)
         accept_btn.setFixedWidth(24)
         accept_btn.setFixedHeight(24)
-        accept_btn_menu = QtWidgets.QMenu(accept_btn)
-        accept_btn.setMenu(accept_btn_menu)
 
         asset_layout.addWidget(self._assets_box)
         asset_layout.addWidget(self._asset_label)
@@ -664,8 +661,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._representations_box.currentIndexChanged.connect(
             self.on_combobox_changed
         )
-        self._accept_btn.clicked.connect(self.btn_clicked)
-        accept_btn_menu.triggered.connect(self._on_accept)
+        self._accept_btn.clicked.connect(self._on_accept)
 
         main_layout.addLayout(context_layout)
         self.setLayout(main_layout)
@@ -838,97 +834,10 @@ class SwitchAssetDialog(QtWidgets.QDialog):
             repre_values = list()
 
         # Fill comboboxes with values
-        loaders = self.prepare_loaders(asset_ok, subset_ok, repre_ok)
         self.set_labels()
-        self.apply_validations(asset_ok, subset_ok, repre_ok, bool(loaders))
-        self._build_loader_menu(loaders)
+        self.apply_validations(asset_ok, subset_ok, repre_ok)
 
         self.fill_check = True
-
-    def prepare_loaders(self, asset_ok, subset_ok, repre_ok):
-        if not all((asset_ok, subset_ok, repre_ok)):
-            return list()
-
-        repres = self.repres_for_loaders_filter()
-        return self._get_loaders(repres)
-
-    def repres_for_loaders_filter(self):
-        selected_asset = self._assets_box.get_valid_value()
-        selected_subset = self._subsets_box.get_valid_value()
-        selected_repre = self._representations_box.get_valid_value()
-        if (
-            selected_asset is None
-            and selected_subset is None
-            and selected_repre is None
-        ):
-            return list(self.content_repres.values())
-
-        if selected_asset is None and selected_subset is None:
-            repres = []
-            for repre in self.content_repres.values():
-                if repre["name"] == selected_repre:
-                    repres.append(repre)
-            return repres
-
-        if selected_asset:
-            asset_doc = io.find_one({"type": "asset", "name": selected_asset})
-            asset_ids = [asset_doc["_id"]]
-        else:
-            asset_ids = list(self.content_assets.keys())
-
-        subset_query = {
-            "type": "subset",
-            "parent": {"$in": asset_ids}
-        }
-        if selected_subset:
-            subset_query["name"] = selected_subset
-
-        subset_docs = list(io.find(subset_query))
-        versions = io.find({
-            "type": "version",
-            "parent": {"$in": [subset["_id"] for subset in subset_docs]}
-        }, sort=[("name", -1)])
-
-        highest_version_mapping = {}
-        for version in versions:
-            subset_id = version["parent"]
-            if subset_id not in highest_version_mapping:
-                highest_version_mapping[subset_id] = version
-
-        higher_versions_by_id = {
-            version["_id"]: version
-            for version in highest_version_mapping.values()
-        }
-        repre_names = []
-        if selected_repre:
-            repre_names.append(selected_repre)
-        else:
-            for repre_doc in self.content_repres.values():
-                repre_names.append(repre_doc["name"])
-
-        repre_docs = io.find({
-            "type": "representation",
-            "name": {"$in": repre_names},
-            "parent": {"$in": list(higher_versions_by_id.keys())}
-        })
-
-        repres_by_parent_id = collections.defaultdict(set)
-        repres_by_name = collections.defaultdict(list)
-        for repre_doc in repre_docs:
-            repres_by_parent_id[repre_doc["parent"]].add(repre_doc["name"])
-            repres_by_name[repre_doc["name"]].append(repre_doc)
-
-        possible_repre_names = None
-        for repre_names in repres_by_parent_id.values():
-            if possible_repre_names is None:
-                possible_repre_names = repre_names
-            else:
-                possible_repre_names = possible_repre_names & repre_names
-
-        ready_repres = list()
-        for repre_name in possible_repre_names or list():
-            ready_repres.extend(repres_by_name[repre_name])
-        return ready_repres
 
     def _get_loaders(self, representations):
         if not representations:
@@ -949,43 +858,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 loaders.add(loader)
 
         return loaders
-
-    def _build_loader_menu(self, loaders):
-        menu = self._accept_btn.menu()
-        menu.clear()
-
-        if not loaders:
-            action = menu.addAction("No compatible loaders")
-            action.setData(None)
-            return
-
-        loaders_by_label = collections.defaultdict(list)
-        for loader in loaders:
-            # Label
-            label = getattr(loader, "label", None)
-            if label is None:
-                label = loader.__name__
-
-            loaders_by_label[label].append(loader)
-
-        for label in sorted(loaders_by_label.keys()):
-            for loader in loaders_by_label[label]:
-                action = menu.addAction(label)
-                action.setData(loader)
-
-                # Support font-awesome icons using the `.icon` and `.color`
-                # attributes on plug-ins.
-                icon = getattr(loader, "icon", None)
-                if icon is not None:
-                    try:
-                        key = "fa.{0}".format(icon)
-                        color = getattr(loader, "color", "white")
-                        action.setIcon(qtawesome.icon(key, color=color))
-                    except Exception as e:
-                        print("Unable to set icon for loader "
-                              "{}: {}".format(loader, e))
-
-                menu.addAction(action)
 
     def _fill_combobox(self, values, combobox_type):
         if combobox_type == "asset":
@@ -1020,7 +892,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self._subset_label.setText(subset_label or default)
         self._repre_label.setText(repre_label or default)
 
-    def apply_validations(self, asset_ok, subset_ok, repre_ok, loaders_ok):
+    def apply_validations(self, asset_ok, subset_ok, repre_ok):
         error_msg = "*Please select"
         error_sheet = "border: 1px solid red;"
         success_sheet = "border: 1px solid green;"
@@ -1029,7 +901,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         subset_sheet = None
         repre_sheet = None
         accept_sheet = None
-        all_ok = asset_ok and subset_ok and repre_ok and loaders_ok
+        all_ok = asset_ok and subset_ok and repre_ok
 
         if asset_ok is False:
             asset_sheet = error_sheet
@@ -1037,7 +909,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         elif subset_ok is False:
             subset_sheet = error_sheet
             self._subset_label.setText(error_msg)
-        elif repre_ok is False or loaders_ok is False:
+        elif repre_ok is False:
             repre_sheet = error_sheet
             self._repre_label.setText(error_msg)
 
@@ -1314,14 +1186,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                 return False
         return True
 
-    def btn_clicked(self):
-        self._accept_btn.showMenu()
-
-    def _on_accept(self, action):
-        selected_loader = action.data()
-        if selected_loader is None:
-            return
-
+    def _on_accept(self):
         # Use None when not a valid value or when placeholder value
         selected_asset = self._assets_box.get_valid_value()
         selected_subset = self._subsets_box.get_valid_value()
@@ -1444,7 +1309,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
                     repre_doc = repres_by_name[container_repre_name]
 
             try:
-                api.switch(container, repre_doc, selected_loader)
+                api.switch(container, repre_doc)
             except Exception:
                 self.log.warning(
                     (
