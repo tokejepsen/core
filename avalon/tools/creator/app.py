@@ -641,3 +641,7 @@ def show(debug=False, parent=None):
         window.show()
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()
