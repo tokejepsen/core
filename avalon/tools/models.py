@@ -224,7 +224,7 @@ class TasksModel(TreeModel):
                                       color=style.colors.default)
                 self._icons[task["name"]] = icon
 
-    def set_assets(self, asset_ids=[], asset_docs=None):
+    def set_assets(self, asset_ids=None, asset_docs=None):
         """Set assets to track by their database id
 
         Arguments:
@@ -233,10 +233,7 @@ class TasksModel(TreeModel):
 
         """
 
-        assets = list()
-        if asset_docs is not None:
-            assets = asset_docs
-        elif asset_ids:
+        if asset_docs is None and asset_ids is not None:
             # prepare filter query
             _filter = {"type": "asset", "_id": {"$in": asset_ids}}
 
@@ -256,6 +253,9 @@ class TasksModel(TreeModel):
             assert not not_found, "Assets not found by id: {0}".format(
                 ", ".join(not_found)
             )
+
+        if asset_docs is None:
+            asset_docs = list()
 
         self._num_assets = len(asset_docs)
 
