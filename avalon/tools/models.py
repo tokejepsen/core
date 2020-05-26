@@ -6,6 +6,7 @@ from ..vendor.Qt import QtCore, QtGui
 from ..vendor import Qt, qtawesome
 from .. import io
 from .. import style
+from . import lib
 
 log = logging.getLogger(__name__)
 
@@ -223,25 +224,25 @@ class TasksModel(TreeModel):
                                       color=style.colors.default)
                 self._icons[task["name"]] = icon
 
-    def set_assets(self, asset_ids=[], asset_entities=None):
+    def set_assets(self, asset_ids=[], asset_docs=None):
         """Set assets to track by their database id
 
         Arguments:
             asset_ids (list): List of asset ids.
-            asset_entities (list): List of asset entities from MongoDB.
+            asset_docs (list): List of asset entities from MongoDB.
 
         """
 
         assets = list()
-        if asset_entities is not None:
-            assets = asset_entities
+        if asset_docs is not None:
+            assets = asset_docs
         elif asset_ids:
             # prepare filter query
             _filter = {"type": "asset", "_id": {"$in": asset_ids}}
 
             # find assets in db by query
-            assets = list(io.find(_filter))
-            db_assets_ids = [asset["_id"] for asset in assets]
+            asset_docs = list(io.find(_filter))
+            db_assets_ids = [asset["_id"] for asset in asset_docs]
 
             # check if all assets were found
             not_found = [
@@ -252,11 +253,15 @@ class TasksModel(TreeModel):
                 ", ".join(not_found)
             )
 
-        self._num_assets = len(assets)
+            assert not not_found, "Assets not found by id: {0}".format(
+                ", ".join(not_found)
+            )
+
+        self._num_assets = len(asset_docs)
 
         tasks = collections.Counter()
-        for asset in assets:
-            asset_tasks = asset.get("data", {}).get("tasks", [])
+        for asset_doc in asset_docs:
+            asset_tasks = asset_doc.get("data", {}).get("tasks", [])
             tasks.update(asset_tasks)
 
         self.clear()
@@ -405,20 +410,20 @@ class AssetModel(TreeModel):
         self.clear()
         self.beginResetModel()
 
-        # Get all assets in current silo sorted by name
+        # Get all assets sorted by name
         db_assets = io.find({"type": "asset"}).sort("name", 1)
-        silos = db_assets.distinct("silo") or None
-        # if any silo is set to None then it's expected it should not be used
-        if silos and None in silos:
-            silos = None
+        project_doc = io.find({"type": "project"})
+
+        silos = None
+        if lib.project_use_silo(project_doc):
+            silos = db_assets.distinct("silo")
 
         # Group the assets by their visual parent's id
         assets_by_parent = collections.defaultdict(list)
         for asset in db_assets:
-            parent_id = (
-                asset.get("data", {}).get("visualParent") or
-                asset.get("silo")
-            )
+            parent_id = asset.get("data", {}).get("visualParent")
+            if parent_id is None and silos is not None:
+                parent_id = asset.get("silo")
             assets_by_parent[parent_id].append(asset)
 
         # Build the hierarchical tree items recursively

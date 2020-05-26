@@ -1175,11 +1175,14 @@ def update_current_task(task=None, asset=None, app=None):
         Session, task=task, asset=asset, app=app
     )
 
-    # Update the full session in one go to avoid half updates
-    Session.update(changes)
-
-    # Update the environment
-    os.environ.update(changes)
+    # Update the Session and environments. Pop from environments all keys with
+    # value set to None.
+    for key, value in changes.items():
+        Session[key] = value
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
     # Emit session change
     emit("taskChanged", changes.copy())
