@@ -197,8 +197,6 @@ class AssetCreateDialog(QtWidgets.QDialog):
             "label": label,
             "visualParent": parent_id
         }
-        if self.is_silo_required:
-            data["silo"] = silo
 
         if self.is_silo_required:
             data["silo"] = silo
