@@ -56,6 +56,13 @@ class AssetWidget(QtWidgets.QWidget):
         refresh = QtWidgets.QPushButton(icon, "")
         refresh.setToolTip("Refresh items")
 
+        # Header
+        header = QtWidgets.QHBoxLayout()
+
+        icon = qtawesome.icon("fa.refresh", color=style.colors.light)
+        refresh = QtWidgets.QPushButton(icon, "")
+        refresh.setToolTip("Refresh items")
+
         filter = QtWidgets.QLineEdit()
         filter.textChanged.connect(proxy.setFilterFixedString)
         filter.setPlaceholderText("Filter assets..")
