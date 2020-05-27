@@ -607,7 +607,6 @@ class SwitchAssetDialog(QtWidgets.QDialog):
     MIN_WIDTH = 550
 
     fill_check = False
-    initialized = False
     switched = QtCore.Signal()
 
     def __init__(self, parent=None, items=None):
@@ -656,11 +655,9 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         self._accept_btn = accept_btn
 
-        self._assets_box.currentIndexChanged.connect(self.on_combobox_changed)
-        self._subsets_box.currentIndexChanged.connect(self.on_combobox_changed)
-        self._representations_box.currentIndexChanged.connect(
-            self.on_combobox_changed
-        )
+        self._assets_box.currentIndexChanged.connect(self.refresh)
+        self._subsets_box.currentIndexChanged.connect(self.refresh)
+        self._representations_box.currentIndexChanged.connect(self.refresh)
         self._accept_btn.clicked.connect(self._on_accept)
 
         main_layout.addLayout(context_layout)
@@ -668,15 +665,13 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         self._items = items
         self._prepare_content_data()
-        self.refresh()
+        self.refresh(True)
 
         self.setMinimumWidth(self.MIN_WIDTH)
 
         # Set default focus to accept button so you don't directly type in
         # first asset field, this also allows to see the placeholder value.
         accept_btn.setFocus()
-        self.fill_check = True
-        self.initialized = True
 
     def _prepare_content_data(self):
         repre_ids = [
@@ -785,12 +780,9 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         self.archived_subsets = archived_subsets
         self.archived_repres = archived_repres
 
-    def on_combobox_changed(self):
-        self.refresh(1)
-
-    def refresh(self, refresh_type=0):
+    def refresh(self, init_refresh=False):
         """Build the need comboboxes with content"""
-        if (not self.fill_check or not self.initialized) and refresh_type > 0:
+        if not self.fill_check and not init_refresh:
             return
 
         self.fill_check = False
@@ -803,7 +795,7 @@ class SwitchAssetDialog(QtWidgets.QDialog):
         subset_values = None
         repre_values = None
 
-        if refresh_type < 1:
+        if init_refresh:
             asset_values = self._get_asset_box_values()
             self._fill_combobox(asset_values, "asset")
 
