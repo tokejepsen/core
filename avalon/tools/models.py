@@ -250,10 +250,6 @@ class TasksModel(TreeModel):
                 ", ".join(not_found)
             )
 
-            assert not not_found, "Assets not found by id: {0}".format(
-                ", ".join(not_found)
-            )
-
         if asset_docs is None:
             asset_docs = list()
 
