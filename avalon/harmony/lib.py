@@ -10,9 +10,11 @@ import shutil
 import logging
 import contextlib
 import json
+import signal
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
+from ..tools import workfiles
 
 self = sys.modules[__name__]
 self.server = None
@@ -20,6 +22,7 @@ self.pid = None
 self.application_path = None
 self.callback_queue = None
 self.workfile_path = None
+self.port = None
 
 # Setup logging.
 self.log = logging.getLogger(__name__)
@@ -35,7 +38,7 @@ def main_thread_listen():
     callback()
 
 
-def launch(application_path, scene_path=None):
+def launch(application_path):
     """Setup for Harmony launch.
 
     Launches Harmony and the server, then starts listening on the main thread
@@ -46,38 +49,68 @@ def launch(application_path, scene_path=None):
 
     api.install(harmony)
 
-    port = random.randrange(5000, 6000)
-    os.environ["AVALON_HARMONY_PORT"] = str(port)
+    self.port = random.randrange(5000, 6000)
+    os.environ["AVALON_HARMONY_PORT"] = str(self.port)
     self.application_path = application_path
 
     # Launch Harmony.
     os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
 
-    path = scene_path
-    if not scene_path:
-        harmony_path = os.path.join(
-            os.path.expanduser("~"), ".avalon", "harmony"
-        )
-        zip_file = os.path.join(os.path.dirname(__file__), "temp_scene.zip")
-        with zipfile.ZipFile(zip_file, "r") as zip_ref:
-            zip_ref.extractall(harmony_path)
+    if os.environ.get("AVALON_HARMONY_WORKFILES_ON_LAUNCH", False):
+        workfiles.show(save=False)
 
-        path = os.path.join(harmony_path, "temp", "temp.xstage")
+    # No launch through Workfiles happened.
+    if not self.workfile_path:
+        zip_file = os.path.join(os.path.dirname(__file__), "temp.zip")
+        launch_zip_file(zip_file)
 
-    process = subprocess.Popen([application_path, path])
+    self.callback_queue = queue.Queue()
+    while True:
+        main_thread_listen()
 
-    self.pid = process.pid
+
+def get_local_harmony_path(filepath):
+    """From the provided path get the equivalent local Harmony path."""
+    basename = os.path.splitext(os.path.basename(filepath))[0]
+    harmony_path = os.path.join(os.path.expanduser("~"), ".avalon", "harmony")
+    return os.path.join(harmony_path, basename)
+
+
+def launch_zip_file(filepath):
+    """Launch a Harmony application instance with the provided zip file."""
+    print("Localizing {}".format(filepath))
+
+    temp_path = get_local_harmony_path(filepath)
+    scene_path = os.path.join(
+        temp_path, os.path.basename(temp_path) + ".xstage"
+    )
+    if os.path.exists(scene_path):
+        # Check remote scene is newer than local.
+        if os.path.getmtime(scene_path) < os.path.getmtime(filepath):
+            shutil.rmtree(temp_path)
+            with zipfile.ZipFile(filepath, "r") as zip_ref:
+                zip_ref.extractall(temp_path)
+
+    # Close existing scene.
+    if self.pid:
+        os.kill(self.pid, signal.SIGTERM)
+
+    # Stop server.
+    if self.server:
+        self.server.stop()
 
     # Launch Avalon server.
-    self.server = Server(port)
+    self.server = Server(self.port)
     thread = threading.Thread(target=self.server.start)
     thread.deamon = True
     thread.start()
 
-    if not scene_path:
-        self.callback_queue = queue.Queue()
-        while True:
-            main_thread_listen()
+    # Save workfile path for later.
+    self.workfile_path = filepath
+
+    print("Launching {}".format(scene_path))
+    process = subprocess.Popen([self.application_path, scene_path])
+    self.pid = process.pid
 
 
 def on_file_changed(path):
