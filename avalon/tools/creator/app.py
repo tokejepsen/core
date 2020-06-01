@@ -138,6 +138,7 @@ class Window(QtWidgets.QDialog):
         container = QtWidgets.QWidget()
 
         listing = QtWidgets.QListWidget()
+        listing.setSortingEnabled(True)
         asset = QtWidgets.QLineEdit()
         name = SubsetNameLineEdit()
         result = QtWidgets.QLineEdit()
@@ -640,3 +641,7 @@ def show(debug=False, parent=None):
         window.show()
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()

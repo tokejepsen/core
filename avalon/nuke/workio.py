@@ -1,6 +1,7 @@
 """Host API required Work Files tool"""
 import os
 import nuke
+from avalon import api
 
 
 def file_extensions():
@@ -29,6 +30,13 @@ def open_file(filepath):
     nuke.Root()["name"].setValue(filepath)
     nuke.Root()["project_directory"].setValue(os.path.dirname(filepath))
     nuke.Root().setModified(False)
+
+    # Since we clear the current script and read in contents of the file path
+    # instead of loading the script (to stay within the same window), there are
+    # no callbacks emitted by Nuke. To accommodate callbacks on loading we
+    # introduce this signal.
+    api.emit("workio.open_file")
+
     return True
 
 

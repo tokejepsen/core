@@ -362,7 +362,9 @@ class View(QtWidgets.QTreeView):
             name = item.get("objectName")
             if name in object_names:
                 self.scrollTo(item)  # Ensure item is visible
-                selection_model.select(item, select_mode)
+                flags = select_mode | selection_model.Rows
+                selection_model.select(item, flags)
+
                 object_names.remove(name)
 
             if len(object_names) == 0:
@@ -1664,9 +1666,10 @@ class Window(QtWidgets.QDialog):
 
         self.resize(1100, 480)
         self.setWindowTitle(
-            "Scene Inventory 1.0 - %s/%s" % (
-                api.registered_root().replace("\\", "/"),
-                os.getenv("AVALON_PROJECT")))
+            "Scene Inventory 1.0 - {}".format(
+                os.getenv("AVALON_PROJECT") or "<Project not set>"
+            )
+        )
         self.setObjectName("SceneInventory")
         self.setProperty("saveWindowPref", True)  # Maya only property!
 
@@ -1740,6 +1743,16 @@ class Window(QtWidgets.QDialog):
 
         tools_lib.refresh_family_config_cache()
 
+    def keyPressEvent(self, event):
+        """Custom keyPressEvent.
+
+        Override keyPressEvent to do nothing so that Maya's panels won't
+        take focus when pressing "SHIFT" whilst mouse is over viewport or
+        outliner. This way users don't accidently perform Maya commands
+        whilst trying to name an instance.
+
+        """
+
     def refresh(self):
         with tools_lib.preserve_expanded_rows(tree_view=self.view,
                                               role=self.model.UniqueRole):
@@ -1786,3 +1799,7 @@ def show(root=None, debug=False, parent=None):
         window.refresh()
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()

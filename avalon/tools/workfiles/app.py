@@ -17,6 +17,8 @@ from ..delegates import PrettyTimeDelegate
 from .model import FilesModel
 from .view import FilesView
 
+from pypeapp import Anatomy
+
 log = logging.getLogger(__name__)
 
 module = sys.modules[__name__]
@@ -61,12 +63,8 @@ class NameWindow(QtWidgets.QDialog):
         }
 
         # Define work files template
-        templates = project["config"]["template"]
-        template = templates.get(
-            "workfile",
-            "{task[name]}_v{version:0>4}<_{comment}>"
-        )
-        self.template = template
+        anatomy = Anatomy(project["name"])
+        self.template = anatomy.templates["work"]["file"]
 
         self.widgets = {
             "preview": QtWidgets.QLabel("Preview filename"),
@@ -152,6 +150,17 @@ class NameWindow(QtWidgets.QDialog):
         if not data["comment"]:
             data.pop("comment", None)
 
+        # Define saving file extension
+        current_file = self.host.current_file()
+        if current_file:
+            # Match the extension of current file
+            _, extension = os.path.splitext(current_file)
+        else:
+            # Fall back to the first extension supported for this host.
+            extension = self.host.file_extensions()[0]
+
+        data["ext"] = extension
+
         # Remove optional missing keys
         pattern = re.compile(r"<.*?>")
         invalid_optionals = []
@@ -166,20 +175,19 @@ class NameWindow(QtWidgets.QDialog):
 
         work_file = template.format(**data)
 
+        if not work_file.endswith(extension):
+            if not extension.startswith("."):
+                extension = "." + extension
+
+            work_file += extension
+
         # Remove optional symbols
-        work_file = work_file.replace("<", "")
-        work_file = work_file.replace(">", "")
-
-        # Define saving file extension
-        current_file = self.host.current_file()
-        if current_file:
-            # Match the extension of current file
-            _, extension = os.path.splitext(current_file)
-        else:
-            # Fall back to the first extension supported for this host.
-            extension = self.host.file_extensions()[0]
-
-        work_file = work_file + extension
+        work_file = (
+            work_file
+            .replace("<", "")
+            .replace(">", "")
+            .replace("..", ".")
+        )
 
         return work_file
 
@@ -518,7 +526,8 @@ class FilesWidget(QtWidgets.QWidget):
                 pass
 
         self._enter_session()
-        return host.open_file(filepath)
+        host.open_file(filepath)
+        self.window().close()
 
     def save_changes_prompt(self):
         self._messagebox = QtWidgets.QMessageBox()
@@ -597,7 +606,7 @@ class FilesWidget(QtWidgets.QWidget):
             print("No file selected to open..")
             return
 
-        return self.open_file(path)
+        self.open_file(path)
 
     def on_browse_pressed(self):
 
@@ -791,6 +800,16 @@ class Window(QtWidgets.QMainWindow):
 
         self.resize(900, 600)
 
+    def keyPressEvent(self, event):
+        """Custom keyPressEvent.
+
+        Override keyPressEvent to do nothing so that Maya's panels won't
+        take focus when pressing "SHIFT" whilst mouse is over viewport or
+        outliner. This way users don't accidently perform Maya commands
+        whilst trying to name an instance.
+
+        """
+
     def on_task_changed(self):
         # Since we query the disk give it slightly more delay
         tools_lib.schedule(self._on_task_changed, 100, channel="mongo")
@@ -899,3 +918,7 @@ def show(root=None, debug=False, parent=None, use_context=True):
         window.setStyleSheet(style.load_stylesheet())
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()
