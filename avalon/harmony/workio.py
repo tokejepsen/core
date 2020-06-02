@@ -1,16 +1,8 @@
 """Host API required Work Files tool"""
 import os
 import shutil
-import zipfile
-import signal
 
 from . import lib
-
-
-def _get_temp_path(filepath):
-    basename = os.path.splitext(os.path.basename(filepath))[0]
-    harmony_path = os.path.join(os.path.expanduser("~"), ".avalon", "harmony")
-    return os.path.join(harmony_path, basename)
 
 
 def file_extensions():
@@ -25,7 +17,7 @@ def has_unsaved_changes():
 
 
 def save_file(filepath):
-    temp_path = _get_temp_path(filepath)
+    temp_path = lib.get_local_harmony_path(filepath)
 
     if os.path.exists(temp_path):
         shutil.rmtree(temp_path)
@@ -55,30 +47,7 @@ def save_file(filepath):
 
 
 def open_file(filepath):
-    temp_path = _get_temp_path(filepath)
-
-    with zipfile.ZipFile(filepath, "r") as zip_ref:
-        zip_ref.extractall(temp_path)
-
-    # Close existing scene.
-    if lib.pid:
-        os.kill(lib.pid, signal.SIGTERM)
-
-    # Stop server.
-    if lib.server:
-        lib.server.stop()
-
-    # Save workfile path for later.
-    lib.workfile_path = filepath
-
-    # Disable workfiles on launch.
-    os.environ["AVALON_HARMONY_WORKFILES_ON_LAUNCH"] = "0"
-
-    # Launch new scene.
-    scene_path = os.path.join(
-        temp_path, os.path.basename(temp_path) + ".xstage"
-    )
-    lib.launch(lib.application_path, scene_path=scene_path)
+    lib.launch_zip_file(filepath)
 
 
 def current_file():
