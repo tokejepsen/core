@@ -250,10 +250,10 @@ function start()
   };
 
 	app.watcher = new QFileSystemWatcher();
-  extension = ".xstage"
+  extension = ".xstage";
   var product_name = about.productName();
   if (product_name.toLowerCase().indexOf("storyboard") !== -1){
-  	extension = ".sboard"
+  	extension = ".sboard";
   }
 	scene_path = scene.currentProjectPath() + "/" + scene.currentVersionName() + extension;
 	app.watcher.addPath(scene_path);
