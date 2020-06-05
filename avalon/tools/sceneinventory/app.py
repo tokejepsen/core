@@ -123,7 +123,76 @@ class View(QtWidgets.QTreeView):
             if has_outdated:
                 break
 
-        updatetolatest_action = None
+        update_to_versioned = None
+        if has_loaded_master_versions:
+            def _on_update_to_versioned(items):
+                repre_ids = []
+                for item in items:
+                    item_id = io.ObjectId(item["representation"])
+                    if item_id not in repre_ids:
+                        repre_ids.append(item_id)
+
+                repre_entities = io.find({
+                    "type": "representation",
+                    "_id": {"$in": repre_ids}
+                })
+
+                version_ids = []
+                master_version_id_by_repre_id = {}
+                for repre in repre_entities:
+                    version_id = repre["parent"]
+                    master_version_id_by_repre_id[repre["_id"]] = version_id
+                    if version_id not in parent_ids:
+                        version_ids.append(version_id)
+
+                master_versions = list(io.find({
+                    "_id": {"$in": version_ids},
+                    "type": "master_version"
+                }))
+
+                version_ids = set()
+                version_id_by_repre_id = {}
+                for master_version in master_versions:
+                    version_id = master_version["version_id"]
+                    version_ids.set(version_id)
+                    master_version_id = master_version["_id"]
+                    for _repre_id, _master_version_id in (
+                        master_version_id_by_repre_id.items()
+                    ):
+                        if _master_version_id == master_version_id:
+                            version_id_by_repre_id[_repre_id] = version_id
+
+                version_docs = io.find({
+                    "_id": {"$in": list(version_ids)},
+                    "type": "version"
+                })
+                version_name_by_id = {}
+                for version in version_docs:
+                    version_name_by_id[version["_id"]] = version["name"]
+
+                for item in items:
+                    repre_id = io.ObjectId(item["representation"])
+                    version_id = version_id_by_repre_id.get(repre_id)
+                    version_name = version_name_by_id.get(version_id)
+                    if version_name is None:
+                        continue
+                    api.update(item, version_name)
+                self.data_changed.emit()
+
+            update_icon = qtawesome.icon(
+                "fa.asterisk",
+                color=DEFAULT_COLOR
+            )
+            update_to_versioned = QtWidgets.QAction(
+                update_icon,
+                "Update to versioned",
+                menu
+            )
+            update_to_versioned.triggered.connect(
+                lambda: _on_update_to_versioned(items)
+            )
+
+        update_to_latest_action = None
         if has_outdated or has_loaded_master_versions:
             # update to latest version
             def _on_update_to_latest(items):
@@ -135,12 +204,12 @@ class View(QtWidgets.QTreeView):
                 "fa.angle-double-up",
                 color=DEFAULT_COLOR
             )
-            updatetolatest_action = QtWidgets.QAction(
+            update_to_latest_action = QtWidgets.QAction(
                 update_icon,
                 "Update to latest",
                 menu
             )
-            updatetolatest_action.triggered.connect(
+            update_to_latest_action.triggered.connect(
                 lambda: _on_update_to_latest(items)
             )
 
@@ -193,8 +262,8 @@ class View(QtWidgets.QTreeView):
             lambda: self.show_remove_warning_dialog(items))
 
         # add the actions
-        if updatetolatest_action:
-            menu.addAction(updatetolatest_action)
+        if update_to_latest_action:
+            menu.addAction(update_to_latest_action)
 
         if change_to_master:
             menu.addAction(change_to_master)
