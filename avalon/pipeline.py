@@ -1347,6 +1347,7 @@ def switch(container, representation):
 
     # Get the Loader for this container
     Loader = _get_container_loader(container)
+
     if not Loader:
         raise RuntimeError("Can't switch container. See log for details.")
 
