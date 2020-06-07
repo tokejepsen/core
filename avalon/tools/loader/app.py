@@ -509,8 +509,8 @@ def show(debug=False, parent=None, use_context=False):
             module.window.activateWindow()     # for Windows
             module.window.refresh()
             return
-        except RuntimeError as e:
-            if not e.message.rstrip().endswith("already deleted."):
+        except RuntimeError as exc:
+            if not str(exc).rstrip().endswith("already deleted."):
                 raise
 
             # Garbage collected

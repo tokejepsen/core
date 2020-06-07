@@ -20,15 +20,15 @@ class Window(QtWidgets.QDialog):
 
     def __init__(self, is_silo_project=None, parent=None):
         super(Window, self).__init__(parent)
-        project_name = io.active_project()
+        project_doc = io.find_one({"type": "project"})
+        project_name = project_doc["name"]
+
         self.setWindowTitle("Project Manager ({0})".format(project_name))
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         if is_silo_project is None:
-            is_silo_project = True
-            if not io.distinct("silo"):
-                is_silo_project = False
+            is_silo_project = tools_lib.project_use_silo(project_doc)
         self.is_silo_project = is_silo_project
 
         # assets
@@ -141,7 +141,9 @@ class Window(QtWidgets.QDialog):
             is_silo_required=self.is_silo_project, parent=self
         )
         if self.is_silo_project:
-            dialog.set_silo_input_enable(silo is None)
+            dialog.set_silo_input_enable(
+                parent_id is None or silo is None
+            )
 
         def _on_asset_created(data):
             """Callback whenever asset gets created"""
@@ -168,12 +170,16 @@ class Window(QtWidgets.QDialog):
                 _silo = parent["name"]
             else:
                 _parent_id = parent["_id"] if parent else None
-                _silo = parent.get("_document", {}).get("silo") if parent else None
+                _silo = None
+                if parent:
+                    _silo = parent.get("_document", {}).get("silo")
 
             dialog.set_parent(_parent_id)
             dialog.set_silo(_silo)
             if self.is_silo_project:
-                dialog.set_silo_input_enable(_silo is None)
+                dialog.set_silo_input_enable(
+                    _parent_id is None or _silo is None
+                )
 
         # Set initial values
         dialog.set_parent(parent_id)
@@ -204,7 +210,6 @@ class Window(QtWidgets.QDialog):
         selected = model.get_selected_assets()
         for asset in selected:
             _filter = {"_id": asset["_id"]}
-
             asset_tasks = asset.get("data", {}).get("tasks", [])
             for task in tasks:
                 if task not in asset_tasks:
@@ -232,7 +237,7 @@ class Window(QtWidgets.QDialog):
         model = self.data["model"]["assets"]
         selected = model.get_selected_assets()
 
-        self.data["model"]["tasks"].set_assets(asset_entities=selected)
+        self.data["model"]["tasks"].set_assets(asset_docs=selected)
 
 
 def show(root=None, debug=False, parent=None):
@@ -257,8 +262,8 @@ def show(root=None, debug=False, parent=None):
 
     with tools_lib.application():
         window = Window(parent=parent)
-        window.setStyleSheet(style.load_stylesheet())
         window.show()
+        window.setStyleSheet(style.load_stylesheet())
         window.refresh()
 
         module.window = window

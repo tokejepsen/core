@@ -39,9 +39,7 @@
             "example": "Bruce"
         },
         "silo": {
-            "description": "Group or container of asset",
-            "type": "string",
-            "pattern": "^[a-zA-Z0-9_.]*$",
+            "description": "(Deprecated) Group or container of asset",
             "example": "assets"
         },
         "data": {
