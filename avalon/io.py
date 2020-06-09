@@ -199,7 +199,7 @@ def _from_environment():
         ) if os.getenv(item[0], item[1]) is not None
     }
 
-    session["schema"] = "avalon-core:session-1.0"
+    session["schema"] = "avalon-core:session-2.0"
     try:
         schema.validate(session)
     except schema.ValidationError as e:
@@ -419,6 +419,10 @@ def parenthood(document):
 
         if document is None:
             break
+
+        if document.get("type") == "master_version":
+            _document = self.find_one({"_id": document["version_id"]})
+            document["data"] = _document["data"]
 
         parents.append(document)
 

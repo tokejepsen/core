@@ -110,7 +110,8 @@ def _install_menu():
         creator,
         loader,
         publish,
-        sceneinventory
+        sceneinventory,
+        libraryloader
     )
 
     from . import interactive
@@ -128,7 +129,6 @@ def _install_menu():
             api.Session["AVALON_ASSET"],
             api.Session["AVALON_TASK"]
         )
-
         cmds.menuItem(
             "currentContext",
             label=context_label,
@@ -155,6 +155,10 @@ def _install_menu():
         cmds.menuItem("Manage...",
                       command=lambda *args: sceneinventory.show(
                           parent=self._parent))
+
+        cmds.menuItem("Library...", command=lambda *args: libraryloader.show(
+            parent=self._parent)
+        )
 
         cmds.menuItem(divider=True)
 
@@ -553,12 +557,6 @@ class Creator(api.Creator):
 
 class Loader(api.Loader):
     hosts = ["maya"]
-
-    def __init__(self, context):
-        super(Loader, self).__init__(context)
-        self.fname = self.fname.replace(
-            api.registered_root(), "$AVALON_PROJECTS"
-        )
 
 
 def publish():

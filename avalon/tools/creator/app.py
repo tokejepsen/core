@@ -8,6 +8,7 @@ from ...vendor import six
 from ... import api, io, style
 
 from .. import lib
+from pypeapp import config
 
 module = sys.modules[__name__]
 module.window = None
@@ -115,6 +116,7 @@ class SubsetNameLineEdit(QtWidgets.QLineEdit):
 class Window(QtWidgets.QDialog):
 
     stateChanged = QtCore.Signal(bool)
+    taskSubsetFamilies = ["render"]
 
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
@@ -136,6 +138,7 @@ class Window(QtWidgets.QDialog):
         container = QtWidgets.QWidget()
 
         listing = QtWidgets.QListWidget()
+        listing.setSortingEnabled(True)
         asset = QtWidgets.QLineEdit()
         name = SubsetNameLineEdit()
         result = QtWidgets.QLineEdit()
@@ -301,15 +304,29 @@ class Window(QtWidgets.QDialog):
         if asset and plugin:
             # Get family
             family = plugin.family.rsplit(".", 1)[-1]
+            regex = "{}*".format(family)
+            existed_subset_split = family
+
+            if family in self.taskSubsetFamilies:
+                task = io.Session.get('AVALON_TASK', '')
+                sanitized_task = re.sub('[^0-9a-zA-Z]+', '', task)
+                regex = "{}{}*".format(
+                    family,
+                    sanitized_task.capitalize()
+                )
+                existed_subset_split = "{}{}".format(
+                    family,
+                    sanitized_task.capitalize()
+                )
 
             # Get all subsets of the current asset
             subsets = io.find(filter={"type": "subset",
-                                      "name": {"$regex": "{}*".format(family),
+                                      "name": {"$regex": regex,
                                                "$options": "i"},
                                       "parent": asset["_id"]}) or []
 
             # Get all subsets' their subset name, "Default", "High", "Low"
-            existed_subsets = [sub["name"].split(family)[-1]
+            existed_subsets = [sub["name"].split(existed_subset_split)[-1]
                                for sub in subsets]
 
             if plugin.defaults and isinstance(plugin.defaults, list):
@@ -326,7 +343,18 @@ class Window(QtWidgets.QDialog):
             # Update the result
             if subset_name:
                 subset_name = subset_name[0].upper() + subset_name[1:]
-            result.setText("{}{}".format(family, subset_name))
+
+            if family in self.taskSubsetFamilies:
+                result.setText("{}{}{}".format(
+                    family,
+                    sanitized_task.capitalize(),
+                    subset_name
+                ))
+            else:
+                result.setText("{}{}".format(
+                    family,
+                    subset_name
+                ))
 
             # Indicate subset existence
             if not subset_name:
@@ -397,6 +425,8 @@ class Window(QtWidgets.QDialog):
         asset = self.data["Asset"]
         asset.setText(api.Session["AVALON_ASSET"])
 
+        listing.clear()
+
         has_families = False
 
         creators = api.discover(api.Creator)
@@ -418,7 +448,25 @@ class Window(QtWidgets.QDialog):
             item.setData(QtCore.Qt.ItemIsEnabled, False)
             listing.addItem(item)
 
-        listing.setCurrentItem(listing.item(0))
+        config_data = config.get_presets()["tools"]["creator"]
+        item = None
+        family_type = None
+        task_name = io.Session.get('AVALON_TASK', None)
+        if task_name:
+            for key, value in config_data.items():
+                for t_name in value:
+                    if t_name in task_name.lower():
+                        family_type = key
+                        break
+                if family_type:
+                    break
+            if family_type:
+                items = listing.findItems(family_type, QtCore.Qt.MatchExactly)
+                if len(items) > 0:
+                    item = items[0]
+                    listing.setCurrentItem(item)
+        if not item:
+            listing.setCurrentItem(listing.item(0))
 
     def on_create(self):
 
@@ -588,8 +636,12 @@ def show(debug=False, parent=None):
 
     with lib.application():
         window = Window(parent)
+        window.setStyleSheet(style.load_stylesheet())
         window.refresh()
         window.show()
-        window.setStyleSheet(style.load_stylesheet())
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()

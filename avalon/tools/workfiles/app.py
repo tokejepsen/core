@@ -17,6 +17,8 @@ from ..delegates import PrettyTimeDelegate
 from .model import FilesModel
 from .view import FilesView
 
+from pypeapp import Anatomy
+
 log = logging.getLogger(__name__)
 
 module = sys.modules[__name__]
@@ -45,25 +47,24 @@ class NameWindow(QtWidgets.QDialog):
             session = api.Session
 
         # Set work file data for template formatting
+        project = io.find_one({
+            "type": "project"
+        })
         self.data = {
-            "project": io.find_one({"name": session["AVALON_PROJECT"],
-                                    "type": "project"}),
-            "asset": io.find_one({"name": session["AVALON_ASSET"],
-                                  "type": "asset"}),
-            "task": {
-                "name": session["AVALON_TASK"].lower(),
-                "label": session["AVALON_TASK"]
+            "project": {
+                "name": project["name"],
+                "code": project["data"].get("code")
             },
+            "asset": session["AVALON_ASSET"],
+            "task": session["AVALON_TASK"],
             "version": 1,
             "user": getpass.getuser(),
             "comment": ""
         }
 
         # Define work files template
-        templates = self.data["project"]["config"]["template"]
-        template = templates.get("workfile",
-                                 "{task[name]}_v{version:0>4}<_{comment}>")
-        self.template = template
+        anatomy = Anatomy(project["name"])
+        self.template = anatomy.templates["work"]["file"]
 
         self.widgets = {
             "preview": QtWidgets.QLabel("Preview filename"),
@@ -149,6 +150,17 @@ class NameWindow(QtWidgets.QDialog):
         if not data["comment"]:
             data.pop("comment", None)
 
+        # Define saving file extension
+        current_file = self.host.current_file()
+        if current_file:
+            # Match the extension of current file
+            _, extension = os.path.splitext(current_file)
+        else:
+            # Fall back to the first extension supported for this host.
+            extension = self.host.file_extensions()[0]
+
+        data["ext"] = extension
+
         # Remove optional missing keys
         pattern = re.compile(r"<.*?>")
         invalid_optionals = []
@@ -163,20 +175,19 @@ class NameWindow(QtWidgets.QDialog):
 
         work_file = template.format(**data)
 
+        if not work_file.endswith(extension):
+            if not extension.startswith("."):
+                extension = "." + extension
+
+            work_file += extension
+
         # Remove optional symbols
-        work_file = work_file.replace("<", "")
-        work_file = work_file.replace(">", "")
-
-        # Define saving file extension
-        current_file = self.host.current_file()
-        if current_file:
-            # Match the extension of current file
-            _, extension = os.path.splitext(current_file)
-        else:
-            # Fall back to the first extension supported for this host.
-            extension = self.host.file_extensions()[0]
-
-        work_file = work_file + extension
+        work_file = (
+            work_file
+            .replace("<", "")
+            .replace(">", "")
+            .replace("..", ".")
+        )
 
         return work_file
 
@@ -295,9 +306,8 @@ class TasksWidget(QtWidgets.QWidget):
 
         self._last_selected_task = None
 
-    def set_asset(self, asset_id):
-
-        if asset_id is None:
+    def set_asset(self, asset):
+        if asset is None:
             # Asset deselected
             return
 
@@ -308,7 +318,7 @@ class TasksWidget(QtWidgets.QWidget):
         if current:
             self._last_selected_task = current
 
-        self.models["tasks"].set_assets([asset_id])
+        self.models["tasks"].set_assets(asset_docs=[asset])
 
         if self._last_selected_task:
             self.select_task(self._last_selected_task)
@@ -516,7 +526,8 @@ class FilesWidget(QtWidgets.QWidget):
                 pass
 
         self._enter_session()
-        return host.open_file(filepath)
+        host.open_file(filepath)
+        self.window().close()
 
     def save_changes_prompt(self):
         self._messagebox = QtWidgets.QMessageBox()
@@ -595,17 +606,19 @@ class FilesWidget(QtWidgets.QWidget):
             print("No file selected to open..")
             return
 
-        return self.open_file(path)
+        self.open_file(path)
 
     def on_browse_pressed(self):
 
         filter = " *".join(self.host.file_extensions())
         filter = "Work File (*{0})".format(filter)
-        work_file = QtWidgets.QFileDialog.getOpenFileName(
-            caption="Work Files",
-            dir=self.root,
-            filter=filter
-        )[0]
+        kwargs = {
+            "caption": "Work Files",
+            "directory": self.root,
+            "dir": self.root,
+            "filter": filter
+        }
+        work_file = QtWidgets.QFileDialog.getOpenFileName(**kwargs)[0]
 
         if not work_file:
             return
@@ -724,7 +737,7 @@ class FilesWidget(QtWidgets.QWidget):
                 continue
 
             modified = index.data(role)
-            if modified > highest:
+            if modified is not None and modified > highest:
                 highest_index = index
                 highest = modified
 
@@ -748,7 +761,7 @@ class Window(QtWidgets.QMainWindow):
         widgets = {
             "pages": QtWidgets.QStackedWidget(),
             "body": QtWidgets.QWidget(),
-            "assets": AssetWidget(silo_creatable=False),
+            "assets": AssetWidget(),
             "tasks": TasksWidget(),
             "files": FilesWidget()
         }
@@ -777,7 +790,6 @@ class Window(QtWidgets.QMainWindow):
 
         # Connect signals
         widgets["assets"].current_changed.connect(self.on_asset_changed)
-        widgets["assets"].silo_changed.connect(self.on_asset_changed)
         widgets["tasks"].task_changed.connect(self.on_task_changed)
 
         self.widgets = widgets
@@ -787,6 +799,16 @@ class Window(QtWidgets.QMainWindow):
         self.widgets["files"].widgets["open"].setFocus()
 
         self.resize(900, 600)
+
+    def keyPressEvent(self, event):
+        """Custom keyPressEvent.
+
+        Override keyPressEvent to do nothing so that Maya's panels won't
+        take focus when pressing "SHIFT" whilst mouse is over viewport or
+        outliner. This way users don't accidently perform Maya commands
+        whilst trying to name an instance.
+
+        """
 
     def on_task_changed(self):
         # Since we query the disk give it slightly more delay
@@ -799,19 +821,16 @@ class Window(QtWidgets.QMainWindow):
 
         if "asset" in context:
             asset = context["asset"]
-            asset_document = io.find_one({"name": asset,
-                                          "type": "asset"})
-
-            # Set silo
-            silo = asset_document.get("silo")
-            if self.widgets["assets"].get_current_silo() != silo:
-                self.widgets["assets"].set_silo(silo)
+            asset_document = io.find_one({
+                "name": asset,
+                "type": "asset"
+            })
 
             # Select the asset
             self.widgets["assets"].select_assets([asset], expand=True)
 
             # Force a refresh on Tasks?
-            self.widgets["tasks"].set_asset(asset_id=asset_document["_id"])
+            self.widgets["tasks"].set_asset(asset_document)
 
         if "task" in context:
             self.widgets["tasks"].select_task(context["task"])
@@ -824,7 +843,7 @@ class Window(QtWidgets.QMainWindow):
         self._on_task_changed()
 
     def _on_asset_changed(self):
-        asset = self.widgets["assets"].get_active_asset()
+        asset = self.widgets["assets"].get_selected_assets() or None
 
         if not asset:
             # Force disable the other widgets if no
@@ -832,13 +851,16 @@ class Window(QtWidgets.QMainWindow):
             self.widgets["tasks"].setEnabled(False)
             self.widgets["files"].setEnabled(False)
         else:
+            asset = asset[0]
             self.widgets["tasks"].setEnabled(True)
 
         self.widgets["tasks"].set_asset(asset)
 
     def _on_task_changed(self):
 
-        asset = self.widgets["assets"].get_active_asset_document()
+        asset = self.widgets["assets"].get_selected_assets() or None
+        if asset is not None:
+            asset = asset[0]
         task = self.widgets["tasks"].get_current_task()
 
         self.widgets["tasks"].setEnabled(bool(asset))
@@ -849,7 +871,7 @@ class Window(QtWidgets.QMainWindow):
         files.refresh()
 
 
-def show(root=None, debug=False, parent=None, use_context=True):
+def show(root=None, debug=False, parent=None, use_context=True, save=True):
     """Show Work Files GUI"""
     # todo: remove `root` argument to show()
 
@@ -892,7 +914,13 @@ def show(root=None, debug=False, parent=None, use_context=True):
                        "task": api.Session["AVALON_TASK"]}
             window.set_context(context)
 
+        window.widgets["files"].widgets["save"].setEnabled(save)
+
         window.show()
         window.setStyleSheet(style.load_stylesheet())
 
         module.window = window
+
+        # Pull window to the front.
+        module.window.raise_()
+        module.window.activateWindow()

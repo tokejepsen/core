@@ -43,6 +43,7 @@ if __name__ == "__main__":
         "--exclude-dir=avalon/nuke",
         "--exclude-dir=avalon/houdini",
         "--exclude-dir=avalon/photoshop",
+        "--exclude-dir=avalon/harmony",
         "--exclude-dir=avalon/schema",
 
         # We can expect any vendors to
