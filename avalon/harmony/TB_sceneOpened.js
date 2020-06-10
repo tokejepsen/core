@@ -168,6 +168,8 @@ function start()
       app.avalon_menu = true;
     }
   }
+
+  var menu = null;
 	if (app.avalon_menu == null)
 	{
     var menu = menu_bar.addMenu("Avalon");
