@@ -1,8 +1,11 @@
 import json
 import contextlib
 import subprocess
+import os
+import time
 
 from ..tools import html_server
+from ..tools import workfiles
 
 
 def get_com_objects():
@@ -50,6 +53,11 @@ def launch(application):
     # Launch Photoshop and the html server.
     process = subprocess.Popen(application, stdout=subprocess.PIPE)
     server = html_server.app.start_server(5000)
+
+    # Wait for application launch to show Workfiles.
+    time.sleep(8)
+    if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", False):
+        workfiles.show(save=False)
 
     # Wait on Photoshop to close before closing the html server.
     process.wait()
