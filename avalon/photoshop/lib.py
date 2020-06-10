@@ -141,7 +141,11 @@ def maintained_visibility():
 
 
 def group_selected_layers():
-    """Create a group and adds the selected layers."""
+    """Create a group and adds the selected layers.
+
+    Returns:
+        LayerSet: Created group.
+    """
 
     _app = app()
 
@@ -164,6 +168,8 @@ def group_selected_layers():
         desc,
         get_com_objects().constants().psDisplayNoDialogs
     )
+
+    return _app.ActiveDocument.ActiveLayer
 
 
 def get_selected_layers():
