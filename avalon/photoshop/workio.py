@@ -33,8 +33,10 @@ def open_file(filepath):
 
 
 def current_file():
-    if _active_document():
+    try:
         return os.path.normpath(_active_document().FullName).replace("\\", "/")
+    except Exception:
+        return None
 
 
 def work_root(session):
