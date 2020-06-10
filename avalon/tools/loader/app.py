@@ -509,9 +509,7 @@ def show(debug=False, parent=None, use_context=False):
             module.window.activateWindow()     # for Windows
             module.window.refresh()
             return
-        except (AttributeError, RuntimeError) as exc:
-            pass
-
+        except (AttributeError, RuntimeError):
             # Garbage collected
             module.window = None
 
