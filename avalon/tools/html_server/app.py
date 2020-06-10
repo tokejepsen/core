@@ -17,7 +17,6 @@ def index():
     scripts_html = ""
     buttons_html = ""
     tools = {
-        "contextmanager": "context",
         "workfiles": "workfiles",
         "creator": "create...",
         "loader": "load...",
