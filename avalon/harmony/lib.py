@@ -84,12 +84,18 @@ def launch_zip_file(filepath):
     scene_path = os.path.join(
         temp_path, os.path.basename(temp_path) + ".xstage"
     )
+    unzip = False
     if os.path.exists(scene_path):
         # Check remote scene is newer than local.
         if os.path.getmtime(scene_path) < os.path.getmtime(filepath):
             shutil.rmtree(temp_path)
-            with zipfile.ZipFile(filepath, "r") as zip_ref:
-                zip_ref.extractall(temp_path)
+            unzip = True
+    else:
+        unzip = True
+
+    if unzip:
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            zip_ref.extractall(temp_path)
 
     # Close existing scene.
     if self.pid:
