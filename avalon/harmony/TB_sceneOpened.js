@@ -163,16 +163,15 @@ function start()
 	app.avalon_menu = null;
 	for (var i = 0 ; i < actions.length; i++)
 	{
-		MessageLog.trace(actions[i].text);
-		if (actions[i].text == "Avalon")
-		{
-			app.avalon_menu = true;
-		}
-  	};
+    if (actions[i].text == "Avalon")
+    {
+      app.avalon_menu = true;
+    }
+  }
 	if (app.avalon_menu == null)
 	{
-	  var menu = menu_bar.addMenu("Avalon");
-	}
+    var menu = menu_bar.addMenu("Avalon");
+  }
 
   self.on_creator = function()
   {
@@ -187,8 +186,8 @@ function start()
   };
 	if (app.avalon_menu == null)
 	{
-	  var action = menu.addAction("Create...");
-	  action.triggered.connect(self.on_creator);
+    var action = menu.addAction("Create...");
+    action.triggered.connect(self.on_creator);
 	}
 
   self.on_workfiles = function()
@@ -204,8 +203,8 @@ function start()
   };
 	if (app.avalon_menu == null)
 	{
-	  action = menu.addAction("Workfiles");
-		action.triggered.connect(self.on_workfiles);
+    action = menu.addAction("Workfiles");
+    action.triggered.connect(self.on_workfiles);
 	}
 
   self.on_load = function()
@@ -221,8 +220,8 @@ function start()
   };
 	if (app.avalon_menu == null)
 	{
-	  action = menu.addAction("Load...");
-  		action.triggered.connect(self.on_load);
+    action = menu.addAction("Load...");
+    action.triggered.connect(self.on_load);
 	}
 
   self.on_publish = function()
@@ -238,8 +237,8 @@ function start()
   };
 	if (app.avalon_menu == null)
 	{
-	  action = menu.addAction("Publish...");
-	  action.triggered.connect(self.on_publish);
+    action = menu.addAction("Publish...");
+    action.triggered.connect(self.on_publish);
 	}
 
   self.on_manage = function()
@@ -254,9 +253,9 @@ function start()
     );
   };
 	if (app.avalon_menu == null)
-	{  
-		action = menu.addAction("Manage...");
-	  action.triggered.connect(self.on_manage);
+	{
+    action = menu.addAction("Manage...");
+    action.triggered.connect(self.on_manage);
 	}
 
   // Watch scene file for changes.
