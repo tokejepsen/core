@@ -291,7 +291,7 @@ function start()
       "args": ["application.launched"]
     },
     false
-  )
+  );
 }
 
 function TB_sceneOpened()
