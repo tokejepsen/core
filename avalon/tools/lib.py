@@ -71,7 +71,7 @@ def schedule(func, time, channel="default"):
 
     try:
         self._jobs[channel].stop()
-    except (AttributeError, KeyError):
+    except (AttributeError, KeyError, RuntimeError):
         pass
 
     timer = QtCore.QTimer()

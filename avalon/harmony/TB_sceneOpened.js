@@ -158,8 +158,22 @@ function start()
     app.avalon_client.socket.connectToHost(host, port);
   }
 
-  var menu_bar = QApplication.activeWindow().menuBar();
-  var menu = menu_bar.addMenu("Avalon");
+	var menu_bar = QApplication.activeWindow().menuBar();
+	var actions = menu_bar.actions();
+	app.avalon_menu = null;
+	for (var i = 0 ; i < actions.length; i++)
+	{
+    if (actions[i].text == "Avalon")
+    {
+      app.avalon_menu = true;
+    }
+  }
+
+  var menu = null;
+	if (app.avalon_menu == null)
+	{
+    var menu = menu_bar.addMenu("Avalon");
+  }
 
   self.on_creator = function()
   {
@@ -172,8 +186,11 @@ function start()
       false
     );
   };
-  var action = menu.addAction("Create...");
-  action.triggered.connect(self.on_creator);
+	if (app.avalon_menu == null)
+	{
+    var action = menu.addAction("Create...");
+    action.triggered.connect(self.on_creator);
+	}
 
   self.on_workfiles = function()
   {
@@ -186,8 +203,11 @@ function start()
       false
     );
   };
-  action = menu.addAction("Workfiles");
-  action.triggered.connect(self.on_workfiles);
+	if (app.avalon_menu == null)
+	{
+    action = menu.addAction("Workfiles");
+    action.triggered.connect(self.on_workfiles);
+	}
 
   self.on_load = function()
   {
@@ -200,8 +220,11 @@ function start()
         false
     );
   };
-  action = menu.addAction("Load...");
-  action.triggered.connect(self.on_load);
+	if (app.avalon_menu == null)
+	{
+    action = menu.addAction("Load...");
+    action.triggered.connect(self.on_load);
+	}
 
   self.on_publish = function()
   {
@@ -214,8 +237,11 @@ function start()
         false
     );
   };
-  action = menu.addAction("Publish...");
-  action.triggered.connect(self.on_publish);
+	if (app.avalon_menu == null)
+	{
+    action = menu.addAction("Publish...");
+    action.triggered.connect(self.on_publish);
+	}
 
   self.on_manage = function()
   {
@@ -228,8 +254,11 @@ function start()
         false
     );
   };
-  action = menu.addAction("Manage...");
-  action.triggered.connect(self.on_manage);
+	if (app.avalon_menu == null)
+	{
+    action = menu.addAction("Manage...");
+    action.triggered.connect(self.on_manage);
+	}
 
   // Watch scene file for changes.
   app.on_file_changed = function(path)

@@ -875,9 +875,11 @@ def show(root=None, debug=False, parent=None, use_context=True, save=True):
     """Show Work Files GUI"""
     # todo: remove `root` argument to show()
 
-    if module.window:
+    try:
         module.window.close()
         del(module.window)
+    except (AttributeError, RuntimeError):
+        pass
 
     host = api.registered_host()
     if host is None:
