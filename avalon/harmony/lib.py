@@ -358,3 +358,35 @@ def save_scene():
     func
     """
     self.send({"function": func})
+
+
+def save_scene_as(filepath):
+    """Save Harmony scene as `filepath`."""
+
+    scene_dir = os.path.dirname(filepath)
+    destination = os.path.join(
+        os.path.dirname(self.workfile_path),
+        os.path.splitext(os.path.basename(filepath))[0] + ".zip"
+    )
+
+    if os.path.exists(scene_dir):
+        shutil.rmtree(scene_dir)
+
+    send(
+        {"function": "scene.saveAs", "args": [scene_dir]}
+    )["result"]
+
+    zip_and_move(scene_dir, destination)
+
+    self.workfile_path = destination
+
+    func = """function add_path(path)
+    {
+        var app = QCoreApplication.instance();
+        app.watcher.addPath(path);
+    }
+    add_path
+    """
+    send(
+        {"function": func, "args": [filepath]}
+    )
