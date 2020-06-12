@@ -119,7 +119,7 @@ def launch_zip_file(filepath):
     self.pid = process.pid
 
 
-def on_file_changed(path):
+def on_file_changed(path, threaded=True):
     """Threaded zipping and move of the project directory.
 
     This method is called when the `.xstage` file is changed.
@@ -130,10 +130,14 @@ def on_file_changed(path):
     if self.workfile_path is None:
         return
 
-    thread = threading.Thread(
-        target=zip_and_move, args=(os.path.dirname(path), self.workfile_path)
-    )
-    thread.start()
+    if threaded:
+        thread = threading.Thread(
+            target=zip_and_move,
+            args=(os.path.dirname(path), self.workfile_path)
+        )
+        thread.start()
+    else:
+        zip_and_move(os.path.dirname(path), self.workfile_path)
 
 
 def zip_and_move(source, destination):
@@ -343,7 +347,7 @@ def save_scene():
     scene_path = self.send({"function": func})["result"]
 
     # Manually update the remote file.
-    self.on_file_changed(scene_path)
+    self.on_file_changed(scene_path, threaded=False)
 
     # Re-enable the background watcher.
     func = """function func()
