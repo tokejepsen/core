@@ -283,6 +283,15 @@ function start()
 	app.watcher.addPath(scene_path);
 	app.watcher.fileChanged.connect(app.on_file_changed);
   app.avalon_on_file_changed = true;
+
+  app.avalon_client.send(
+    {
+      "module": "avalon.api",
+      "method": "emit",
+      "args": ["application.launched"]
+    },
+    false
+  );
 }
 
 function TB_sceneOpened()
