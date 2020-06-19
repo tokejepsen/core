@@ -56,7 +56,10 @@ def install():
 
     timeout = int(Session["AVALON_TIMEOUT"])
     self._mongo_client = pymongo.MongoClient(
-        Session["AVALON_MONGO"], serverSelectionTimeoutMS=timeout)
+        host=Session["AVALON_MONGO_HOST"],
+        port=int(Session["AVALON_MONGO_PORT"]),
+        serverSelectionTimeoutMS=timeout
+    )
 
     for retry in range(3):
         try:
@@ -160,6 +163,12 @@ def _from_environment():
 
             # Address to Asset Database
             ("AVALON_MONGO", "mongodb://localhost:27017"),
+
+            # Address to Asset Database without port
+            ("AVALON_MONGO_HOST", "mongodb://localhost"),
+
+            # Address to Asset Database port
+            ("AVALON_MONGO_PORT", "27017"),
 
             # Name of database used in MongoDB
             ("AVALON_DB", "avalon"),

@@ -60,7 +60,10 @@ class DbConnector(object):
 
         timeout = int(self.Session["AVALON_TIMEOUT"])
         self._mongo_client = pymongo.MongoClient(
-            self.Session["AVALON_MONGO"], serverSelectionTimeoutMS=timeout)
+            host=self.Session["AVALON_MONGO_HOST"],
+            port=int(self.Session["AVALON_MONGO_PORT"]),
+            serverSelectionTimeoutMS=timeout
+        )
 
         for retry in range(3):
             try:
@@ -153,6 +156,12 @@ class DbConnector(object):
 
                 # Address to Asset Database
                 ("AVALON_MONGO", "mongodb://localhost:27017"),
+
+                # Address to Asset Database without port
+                ("AVALON_MONGO_HOST", "mongodb://localhost"),
+
+                # Address to Asset Database port
+                ("AVALON_MONGO_PORT", "27017"),
 
                 # Name of database used in MongoDB
                 ("AVALON_DB", "avalon"),
