@@ -183,12 +183,6 @@ def _from_environment():
             # Address to Asset Database
             ("AVALON_MONGO", "mongodb://localhost:27017"),
 
-            # Address to Asset Database without port
-            ("AVALON_MONGO_HOST", "mongodb://localhost"),
-
-            # Address to Asset Database port
-            ("AVALON_MONGO_PORT", "27017"),
-
             # Name of database used in MongoDB
             ("AVALON_DB", "avalon"),
 
