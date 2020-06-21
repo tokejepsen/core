@@ -16,6 +16,7 @@ import contextlib
 
 from ... import schema
 from ...vendor import requests
+from avalon.io import extract_port_from_url
 
 # Third-party dependencies
 import pymongo
@@ -59,11 +60,17 @@ class DbConnector(object):
         self.Session.update(self._from_environment())
 
         timeout = int(self.Session["AVALON_TIMEOUT"])
-        self._mongo_client = pymongo.MongoClient(
-            host=self.Session["AVALON_MONGO_HOST"],
-            port=int(self.Session["AVALON_MONGO_PORT"]),
-            serverSelectionTimeoutMS=timeout
-        )
+        mongo_url = self.Session["AVALON_MONGO"]
+        kwargs = {
+            "host": mongo_url,
+            "serverSelectionTimeoutMS": timeout
+        }
+
+        port = extract_port_from_url(mongo_url)
+        if port is not None:
+            kwargs["port"] = int(port)
+
+        self._mongo_client = pymongo.MongoClient(**kwargs)
 
         for retry in range(3):
             try:
