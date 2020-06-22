@@ -34,7 +34,9 @@ from .lib import (
     read,
     get_com_objects,
     import_smart_object,
-    replace_smart_object
+    replace_smart_object,
+    show,
+    execute_in_main_thread
 )
 
 __all__ = [
@@ -66,5 +68,7 @@ __all__ = [
     "read",
     "get_com_objects",
     "import_smart_object",
-    "replace_smart_object"
+    "replace_smart_object",
+    "show",
+    "execute_in_main_thread"
 ]

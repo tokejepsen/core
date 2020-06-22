@@ -2,10 +2,51 @@ import json
 import contextlib
 import subprocess
 import os
-import time
-import requests
+import sys
+import queue
+import importlib
 
 from ..tools import html_server
+from ..vendor.Qt import QtWidgets
+from ..tools import workfiles
+
+self = sys.modules[__name__]
+self.callback_queue = None
+
+
+def execute_in_main_thread(func_to_call_from_main_thread):
+    self.callback_queue.put(func_to_call_from_main_thread)
+
+
+def main_thread_listen():
+    callback = self.callback_queue.get()
+    callback()
+
+
+def show(module_name):
+    """Call show on "module_name".
+
+    This allows to make a QApplication ahead of time and always "exec_" to
+    prevent crashing.
+
+    Args:
+        module_name (str): Name of module to call "show" on.
+    """
+    # Need to have an existing QApplication.
+    app = QtWidgets.QApplication.instance()
+    if not app:
+        app = QtWidgets.QApplication(sys.argv)
+
+    # Import and show tool.
+    tool_module = importlib.import_module("avalon.tools." + module_name)
+
+    if "loader" in module_name:
+        tool_module.show(use_context=True)
+    else:
+        tool_module.show()
+
+    # QApplication needs to always execute.
+    app.exec_()
 
 
 def get_com_objects():
@@ -58,7 +99,11 @@ def launch(application):
     if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", False):
         # Wait for Photoshop launch.
         if photoshop.app():
-            requests.get("http://localhost:5000/workfiles_route")
+            workfiles.show(save=False)
+
+    self.callback_queue = queue.Queue()
+    while True:
+        main_thread_listen()
 
     # Wait on Photoshop to close before closing the html server.
     process.wait()
