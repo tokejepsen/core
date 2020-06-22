@@ -3,9 +3,9 @@ import contextlib
 import subprocess
 import os
 import time
+import requests
 
 from ..tools import html_server
-from ..tools import workfiles
 
 
 def get_com_objects():
@@ -57,7 +57,7 @@ def launch(application):
     # Wait for application launch to show Workfiles.
     time.sleep(8)
     if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", False):
-        workfiles.show(save=False)
+        requests.get("http://localhost:5000/workfiles_route")
 
     # Wait on Photoshop to close before closing the html server.
     process.wait()
