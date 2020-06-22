@@ -221,11 +221,14 @@ def select_layers(layers):
     desc.PutReference(_app.CharIDToTypeID("null"), ref)
     desc.PutBoolean(_app.CharIDToTypeID("MkVs"), False)
 
-    _app.ExecuteAction(
-        _app.CharIDToTypeID("slct"),
-        desc,
-        get_com_objects().constants().psDisplayNoDialogs
-    )
+    try:
+        _app.ExecuteAction(
+            _app.CharIDToTypeID("slct"),
+            desc,
+            get_com_objects().constants().psDisplayNoDialogs
+        )
+    except Exception:
+        pass
 
 
 def _recurse_layers(layers):
