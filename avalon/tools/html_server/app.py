@@ -1,10 +1,10 @@
-import importlib
 from wsgiref.simple_server import make_server
 import sys
+import functools
 
 from avalon.vendor.bottle import route, template, run, WSGIRefServer
+from avalon import photoshop
 from threading import Thread
-from ...vendor.Qt import QtWidgets
 
 self = sys.modules[__name__]
 self.app = None
@@ -69,17 +69,9 @@ def index():
 @route("/<tool_name>_route")
 def tool_route(tool_name):
     """The address accessed when clicking on the buttons."""
-    # Need to have an existing QApplication.
-    app = QtWidgets.QApplication.instance()
-    if not app:
-        app = QtWidgets.QApplication(sys.argv)
+    partial_method = functools.partial(photoshop.show, tool_name)
 
-    # Import and show tool.
-    tool_module = importlib.import_module("avalon.tools." + tool_name)
-    tool_module.show()
-
-    # QApplication needs to always execute.
-    app.exec_()
+    photoshop.execute_in_main_thread(partial_method)
 
     # Required return statement.
     return "nothing"
