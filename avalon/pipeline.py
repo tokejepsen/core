@@ -13,6 +13,7 @@ import logging
 import weakref
 import inspect
 import traceback
+import platform
 import importlib
 
 from collections import OrderedDict
@@ -445,8 +446,17 @@ class Application(Action):
                 self.log.error(" - %s -> %s" % (src, dst))
 
     def launch(self, environment):
+        executable_path = self.config["executable"]
+        pype_config_path = os.environ.get("PYPE_CONFIG")
+        if pype_config_path:
+            # Get platform folder name
+            os_plat = platform.system().lower()
+            # Path to folder with launchers
+            path = os.path.join(pype_config_path, "launchers", os_plat)
+            if os.path.exists(path):
+                executable_path = os.path.join(path, executable_path)
+        executable = lib.which(executable_path)
 
-        executable = lib.which(self.config["executable"])
         if executable is None:
             raise ValueError(
                 "'%s' not found on your PATH\n%s"
@@ -1175,11 +1185,14 @@ def update_current_task(task=None, asset=None, app=None):
         Session, task=task, asset=asset, app=app
     )
 
-    # Update the full session in one go to avoid half updates
-    Session.update(changes)
-
-    # Update the environment
-    os.environ.update(changes)
+    # Update the Session and environments. Pop from environments all keys with
+    # value set to None.
+    for key, value in changes.items():
+        Session[key] = value
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
     # Emit session change
     emit("taskChanged", changes.copy())
@@ -1344,6 +1357,7 @@ def switch(container, representation):
 
     # Get the Loader for this container
     Loader = _get_container_loader(container)
+
     if not Loader:
         raise RuntimeError("Can't switch container. See log for details.")
 

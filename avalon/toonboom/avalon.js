@@ -147,7 +147,7 @@ function start()
 {
   var self = this;
   var host = "127.0.0.1";
-  var port = parseInt(System.getenv("AVALON_HARMONY_PORT"));
+  var port = parseInt(System.getenv("AVALON_TOONBOOM_PORT"));
 
   // Attach the client to the QApplication to preserve.
   var app = QCoreApplication.instance();
@@ -158,107 +158,78 @@ function start()
     app.avalon_client.socket.connectToHost(host, port);
   }
 
-	var menu_bar = QApplication.activeWindow().menuBar();
-	var actions = menu_bar.actions();
-	app.avalon_menu = null;
-	for (var i = 0 ; i < actions.length; i++)
-	{
-    if (actions[i].text == "Avalon")
-    {
-      app.avalon_menu = true;
-    }
-  }
-
-  var menu = null;
-	if (app.avalon_menu == null)
-	{
-    var menu = menu_bar.addMenu("Avalon");
-  }
+  var menu_bar = QApplication.activeWindow().menuBar();
+  var menu = menu_bar.addMenu("Avalon");
 
   self.on_creator = function()
   {
     app.avalon_client.send(
       {
-        "module": "avalon.harmony.lib",
+        "module": "avalon.toonboom",
         "method": "show",
         "args": ["avalon.tools.creator"]
       },
       false
     );
   };
-	if (app.avalon_menu == null)
-	{
-    var action = menu.addAction("Create...");
-    action.triggered.connect(self.on_creator);
-	}
+  var action = menu.addAction("Create...");
+  action.triggered.connect(self.on_creator);
 
   self.on_workfiles = function()
   {
     app.avalon_client.send(
       {
-        "module": "avalon.harmony.lib",
+        "module": "avalon.toonboom",
         "method": "show",
         "args": ["avalon.tools.workfiles"]
       },
       false
     );
   };
-	if (app.avalon_menu == null)
-	{
-    action = menu.addAction("Workfiles");
-    action.triggered.connect(self.on_workfiles);
-	}
+  action = menu.addAction("Workfiles");
+  action.triggered.connect(self.on_workfiles);
 
   self.on_load = function()
   {
     app.avalon_client.send(
         {
-          "module": "avalon.harmony.lib",
+          "module": "avalon.toonboom",
           "method": "show",
           "args": ["avalon.tools.loader"]
         },
         false
     );
   };
-	if (app.avalon_menu == null)
-	{
-    action = menu.addAction("Load...");
-    action.triggered.connect(self.on_load);
-	}
+  action = menu.addAction("Load...");
+  action.triggered.connect(self.on_load);
 
   self.on_publish = function()
   {
     app.avalon_client.send(
         {
-          "module": "avalon.harmony.lib",
+          "module": "avalon.toonboom",
           "method": "show",
           "args": ["avalon.tools.publish"]
         },
         false
     );
   };
-	if (app.avalon_menu == null)
-	{
-    action = menu.addAction("Publish...");
-    action.triggered.connect(self.on_publish);
-	}
+  action = menu.addAction("Publish...");
+  action.triggered.connect(self.on_publish);
 
   self.on_manage = function()
   {
     app.avalon_client.send(
         {
-          "module": "avalon.harmony.lib",
+          "module": "avalon.toonboom",
           "method": "show",
           "args": ["avalon.tools.sceneinventory"]
         },
         false
     );
   };
-	if (app.avalon_menu == null)
-	{
-    action = menu.addAction("Manage...");
-    action.triggered.connect(self.on_manage);
-	}
+  action = menu.addAction("Manage...");
+  action.triggered.connect(self.on_manage);
 
   // Watch scene file for changes.
   app.on_file_changed = function(path)
@@ -267,7 +238,7 @@ function start()
     if (app.avalon_on_file_changed){
       app.avalon_client.send(
         {
-          "module": "avalon.harmony.lib",
+          "module": "avalon.toonboom",
           "method": "on_file_changed",
           "args": [path]
         },
@@ -279,22 +250,13 @@ function start()
   };
 
 	app.watcher = new QFileSystemWatcher();
-	scene_path = scene.currentProjectPath() +"/" + scene.currentVersionName() + ".xstage";
+  extension = ".xstage";
+  var product_name = about.productName();
+  if (product_name.toLowerCase().indexOf("storyboard") !== -1){
+  	extension = ".sboard";
+  }
+	scene_path = scene.currentProjectPath() + "/" + scene.currentVersionName() + extension;
 	app.watcher.addPath(scene_path);
 	app.watcher.fileChanged.connect(app.on_file_changed);
   app.avalon_on_file_changed = true;
-
-  app.avalon_client.send(
-    {
-      "module": "avalon.api",
-      "method": "emit",
-      "args": ["application.launched"]
-    },
-    false
-  );
-}
-
-function TB_sceneOpened()
-{
-  start();
 }

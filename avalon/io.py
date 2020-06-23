@@ -44,6 +44,19 @@ self._database = None
 self._is_installed = False
 
 log = logging.getLogger(__name__)
+PY2 = sys.version_info[0] == 2
+
+
+def extract_port_from_url(url):
+    if PY2:
+        from urlparse import urlparse
+    else:
+        from urllib.parse import urlparse
+    parsed_url = urlparse(url)
+    if parsed_url.scheme is None:
+        _url = "mongodb://{}".format(url)
+        parsed_url = urlparse(_url)
+    return parsed_url.port
 
 
 def install():
@@ -55,8 +68,17 @@ def install():
     Session.update(_from_environment())
 
     timeout = int(Session["AVALON_TIMEOUT"])
-    self._mongo_client = pymongo.MongoClient(
-        Session["AVALON_MONGO"], serverSelectionTimeoutMS=timeout)
+    mongo_url = Session["AVALON_MONGO"]
+    kwargs = {
+        "host": mongo_url,
+        "serverSelectionTimeoutMS": timeout
+    }
+
+    port = extract_port_from_url(mongo_url)
+    if port is not None:
+        kwargs["port"] = int(port)
+
+    self._mongo_client = pymongo.MongoClient(**kwargs)
 
     for retry in range(3):
         try:

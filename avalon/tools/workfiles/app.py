@@ -318,7 +318,7 @@ class TasksWidget(QtWidgets.QWidget):
         if current:
             self._last_selected_task = current
 
-        self.models["tasks"].set_assets(asset_entities=[asset])
+        self.models["tasks"].set_assets(asset_docs=[asset])
 
         if self._last_selected_task:
             self.select_task(self._last_selected_task)
@@ -871,13 +871,15 @@ class Window(QtWidgets.QMainWindow):
         files.refresh()
 
 
-def show(root=None, debug=False, parent=None, use_context=True):
+def show(root=None, debug=False, parent=None, use_context=True, save=True):
     """Show Work Files GUI"""
     # todo: remove `root` argument to show()
 
-    if module.window:
+    try:
         module.window.close()
         del(module.window)
+    except (AttributeError, RuntimeError):
+        pass
 
     host = api.registered_host()
     if host is None:
@@ -913,6 +915,8 @@ def show(root=None, debug=False, parent=None, use_context=True):
                        "silo": api.Session["AVALON_SILO"],
                        "task": api.Session["AVALON_TASK"]}
             window.set_context(context)
+
+        window.widgets["files"].widgets["save"].setEnabled(save)
 
         window.show()
         window.setStyleSheet(style.load_stylesheet())

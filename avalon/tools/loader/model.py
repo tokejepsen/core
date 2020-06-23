@@ -62,7 +62,12 @@ class SubsetsModel(TreeModel):
 
     def __init__(self, grouping=True, parent=None):
         super(SubsetsModel, self).__init__(parent=parent)
+
+        self.columns_index = dict(
+            (key, idx) for idx, key in enumerate(self.Columns)
+        )
         self._asset_ids = None
+
         self._sorter = None
         self._grouping = grouping
         self._icons = {
@@ -81,7 +86,7 @@ class SubsetsModel(TreeModel):
 
         # Trigger additional edit when `version` column changed
         # because it also updates the information in other columns
-        if index.column() == self.Columns.index("version"):
+        if index.column() == self.columns_index["version"]:
             item = index.internalPointer()
             parent = item["_id"]
             if isinstance(value, MasterVersionType):
@@ -459,7 +464,7 @@ class SubsetsModel(TreeModel):
             return prefix + order
 
         if role == QtCore.Qt.DisplayRole:
-            if index.column() == self.Columns.index("family"):
+            if index.column() == self.columns_index["family"]:
                 # Show familyLabel instead of family
                 item = index.internalPointer()
                 return item.get("familyLabel", None)
@@ -467,7 +472,7 @@ class SubsetsModel(TreeModel):
         elif role == QtCore.Qt.DecorationRole:
 
             # Add icon to subset column
-            if index.column() == self.Columns.index("subset"):
+            if index.column() == self.columns_index["subset"]:
                 item = index.internalPointer()
                 if item.get("isGroup") or item.get("isMerged"):
                     return item["icon"]
@@ -475,7 +480,7 @@ class SubsetsModel(TreeModel):
                     return self._icons["subset"]
 
             # Add icon to family column
-            if index.column() == self.Columns.index("family"):
+            if index.column() == self.columns_index["family"]:
                 item = index.internalPointer()
                 return item.get("familyIcon", None)
 
@@ -492,7 +497,7 @@ class SubsetsModel(TreeModel):
         flags = QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable
 
         # Make the version column editable
-        if index.column() == self.Columns.index("version"):  # version column
+        if index.column() == self.columns_index["version"]:
             flags |= QtCore.Qt.ItemIsEditable
 
         return flags
@@ -571,13 +576,13 @@ class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
         self._families = set(values)
         self.invalidateFilter()
 
-    def filterAcceptsRow(self, row=0, parent=QtCore.QModelIndex()):
+    def filterAcceptsRow(self, row=0, parent=None):
 
         if not self._families:
             return False
 
         model = self.sourceModel()
-        index = model.index(row, 0, parent=parent)
+        index = model.index(row, 0, parent=parent or QtCore.QModelIndex())
 
         # Ensure index is valid
         if not index.isValid() or index is None:

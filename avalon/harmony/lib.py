@@ -10,9 +10,11 @@ import shutil
 import logging
 import contextlib
 import json
+import signal
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
+from ..tools import workfiles
 
 self = sys.modules[__name__]
 self.server = None
@@ -20,6 +22,7 @@ self.pid = None
 self.application_path = None
 self.callback_queue = None
 self.workfile_path = None
+self.port = None
 
 # Setup logging.
 self.log = logging.getLogger(__name__)
@@ -35,7 +38,7 @@ def main_thread_listen():
     callback()
 
 
-def launch(application_path, scene_path=None):
+def launch(application_path):
     """Setup for Harmony launch.
 
     Launches Harmony and the server, then starts listening on the main thread
@@ -46,41 +49,77 @@ def launch(application_path, scene_path=None):
 
     api.install(harmony)
 
-    port = random.randrange(5000, 6000)
-    os.environ["AVALON_HARMONY_PORT"] = str(port)
+    self.port = random.randrange(5000, 6000)
+    os.environ["AVALON_HARMONY_PORT"] = str(self.port)
     self.application_path = application_path
 
     # Launch Harmony.
     os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
 
-    path = scene_path
-    if not scene_path:
-        harmony_path = os.path.join(
-            os.path.expanduser("~"), ".avalon", "harmony"
-        )
-        zip_file = os.path.join(os.path.dirname(__file__), "temp_scene.zip")
-        with zipfile.ZipFile(zip_file, "r") as zip_ref:
-            zip_ref.extractall(harmony_path)
+    if os.environ.get("AVALON_HARMONY_WORKFILES_ON_LAUNCH", False):
+        workfiles.show(save=False)
 
-        path = os.path.join(harmony_path, "temp", "temp.xstage")
+    # No launch through Workfiles happened.
+    if not self.workfile_path:
+        zip_file = os.path.join(os.path.dirname(__file__), "temp.zip")
+        launch_zip_file(zip_file)
 
-    process = subprocess.Popen([application_path, path])
+    self.callback_queue = queue.Queue()
+    while True:
+        main_thread_listen()
 
-    self.pid = process.pid
+
+def get_local_harmony_path(filepath):
+    """From the provided path get the equivalent local Harmony path."""
+    basename = os.path.splitext(os.path.basename(filepath))[0]
+    harmony_path = os.path.join(os.path.expanduser("~"), ".avalon", "harmony")
+    return os.path.join(harmony_path, basename)
+
+
+def launch_zip_file(filepath):
+    """Launch a Harmony application instance with the provided zip file."""
+    print("Localizing {}".format(filepath))
+
+    temp_path = get_local_harmony_path(filepath)
+    scene_path = os.path.join(
+        temp_path, os.path.basename(temp_path) + ".xstage"
+    )
+    unzip = False
+    if os.path.exists(scene_path):
+        # Check remote scene is newer than local.
+        if os.path.getmtime(scene_path) < os.path.getmtime(filepath):
+            shutil.rmtree(temp_path)
+            unzip = True
+    else:
+        unzip = True
+
+    if unzip:
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            zip_ref.extractall(temp_path)
+
+    # Close existing scene.
+    if self.pid:
+        os.kill(self.pid, signal.SIGTERM)
+
+    # Stop server.
+    if self.server:
+        self.server.stop()
 
     # Launch Avalon server.
-    self.server = Server(port)
+    self.server = Server(self.port)
     thread = threading.Thread(target=self.server.start)
     thread.deamon = True
     thread.start()
 
-    if not scene_path:
-        self.callback_queue = queue.Queue()
-        while True:
-            main_thread_listen()
+    # Save workfile path for later.
+    self.workfile_path = filepath
+
+    print("Launching {}".format(scene_path))
+    process = subprocess.Popen([self.application_path, scene_path])
+    self.pid = process.pid
 
 
-def on_file_changed(path):
+def on_file_changed(path, threaded=True):
     """Threaded zipping and move of the project directory.
 
     This method is called when the `.xstage` file is changed.
@@ -91,10 +130,14 @@ def on_file_changed(path):
     if self.workfile_path is None:
         return
 
-    thread = threading.Thread(
-        target=zip_and_move, args=(os.path.dirname(path), self.workfile_path)
-    )
-    thread.start()
+    if threaded:
+        thread = threading.Thread(
+            target=zip_and_move,
+            args=(os.path.dirname(path), self.workfile_path)
+        )
+        thread.start()
+    else:
+        zip_and_move(os.path.dirname(path), self.workfile_path)
 
 
 def zip_and_move(source, destination):
@@ -126,7 +169,11 @@ def show(module_name):
 
     # Import and show tool.
     module = importlib.import_module(module_name)
-    module.show()
+
+    if "loader" in module_name:
+        module.show(use_context=True)
+    else:
+        module.show()
 
     # QApplication needs to always execute.
     if "publish" in module_name:
@@ -277,3 +324,73 @@ def maintained_nodes_state(nodes):
         yield
     finally:
         self.send({"function": func, "args": [nodes, states]})
+
+
+def save_scene():
+    """Saves the Harmony scene safely.
+
+    The built-in (to Avalon) background zip and moving of the Harmony scene
+    folder, interfers with server/client communication by sending two requests
+    at the same time. This only happens when sending "scene.saveAll()". This
+    method prevents this double request and safely saves the scene.
+    """
+    # Need to turn off the backgound watcher else the communication with
+    # the server gets spammed with two requests at the same time.
+    func = """function func()
+    {
+        var app = QCoreApplication.instance();
+        app.avalon_on_file_changed = false;
+        scene.saveAll();
+        return (
+            scene.currentProjectPath() + "/" +
+            scene.currentVersionName() + ".xstage"
+        );
+    }
+    func
+    """
+    scene_path = self.send({"function": func})["result"]
+
+    # Manually update the remote file.
+    self.on_file_changed(scene_path, threaded=False)
+
+    # Re-enable the background watcher.
+    func = """function func()
+    {
+        var app = QCoreApplication.instance();
+        app.avalon_on_file_changed = true;
+    }
+    func
+    """
+    self.send({"function": func})
+
+
+def save_scene_as(filepath):
+    """Save Harmony scene as `filepath`."""
+
+    scene_dir = os.path.dirname(filepath)
+    destination = os.path.join(
+        os.path.dirname(self.workfile_path),
+        os.path.splitext(os.path.basename(filepath))[0] + ".zip"
+    )
+
+    if os.path.exists(scene_dir):
+        shutil.rmtree(scene_dir)
+
+    send(
+        {"function": "scene.saveAs", "args": [scene_dir]}
+    )["result"]
+
+    zip_and_move(scene_dir, destination)
+
+    self.workfile_path = destination
+
+    func = """function add_path(path)
+    {
+        var app = QCoreApplication.instance();
+        app.watcher.addPath(path);
+    }
+    add_path
+    """
+    send(
+        {"function": func, "args": [filepath]}
+    )
