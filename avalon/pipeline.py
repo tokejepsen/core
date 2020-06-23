@@ -13,6 +13,7 @@ import logging
 import weakref
 import inspect
 import traceback
+import platform
 import importlib
 
 from collections import OrderedDict
@@ -445,8 +446,17 @@ class Application(Action):
                 self.log.error(" - %s -> %s" % (src, dst))
 
     def launch(self, environment):
+        executable_path = self.config["executable"]
+        pype_config_path = os.environ.get("PYPE_CONFIG")
+        if pype_config_path:
+            # Get platform folder name
+            os_plat = platform.system().lower()
+            # Path to folder with launchers
+            path = os.path.join(pype_config_path, "launchers", os_plat)
+            if os.path.exists(path):
+                executable_path = os.path.join(path, executable_path)
+        executable = lib.which(executable_path)
 
-        executable = lib.which(self.config["executable"])
         if executable is None:
             raise ValueError(
                 "'%s' not found on your PATH\n%s"

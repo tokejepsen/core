@@ -36,7 +36,8 @@ from .lib import (
     import_smart_object,
     replace_smart_object,
     show,
-    execute_in_main_thread
+    execute_in_main_thread,
+    select_layers
 )
 
 __all__ = [
@@ -70,5 +71,6 @@ __all__ = [
     "import_smart_object",
     "replace_smart_object",
     "show",
-    "execute_in_main_thread"
+    "execute_in_main_thread",
+    "select_layers"
 ]

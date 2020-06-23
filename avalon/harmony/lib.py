@@ -169,7 +169,11 @@ def show(module_name):
 
     # Import and show tool.
     module = importlib.import_module(module_name)
-    module.show()
+
+    if "loader" in module_name:
+        module.show(use_context=True)
+    else:
+        module.show()
 
     # QApplication needs to always execute.
     if "publish" in module_name:
