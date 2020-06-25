@@ -2,6 +2,7 @@
 import os
 
 from . import lib
+from avalon import api
 
 
 def _active_document():
@@ -12,7 +13,7 @@ def _active_document():
 
 
 def file_extensions():
-    return [".psd"]
+    return api.HOST_WORKFILE_EXTENSIONS["photoshop"]
 
 
 def has_unsaved_changes():

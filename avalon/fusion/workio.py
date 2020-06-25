@@ -1,10 +1,11 @@
 """Host API required Work Files tool"""
 import sys
 import os
+from avalon import api
 
 
 def file_extensions():
-    return [".comp"]
+    return api.HOST_WORKFILE_EXTENSIONS["fusion"]
 
 
 def has_unsaved_changes():
