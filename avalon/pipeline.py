@@ -371,6 +371,29 @@ class Application(Action):
         anatomy_filled = anatomy.format(template_data)
         session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
 
+        last_workfile_path = None
+        extensions = HOST_WORKFILE_EXTENSIONS.get(session["AVALON_APP"])
+        if extensions:
+            # Find last workfile
+            file_template = anatomy.templates["work"]["file"]
+            template_data.update({
+                "version": 1,
+                "user": getpass.getuser(),
+                "ext": extensions[0]
+            })
+
+            last_workfile_path = last_workfile(
+                session["AVALON_WORKDIR"],
+                file_template,
+                template_data,
+                extensions,
+                True
+            )
+
+        if last_workfile_path:
+            print(last_workfile_path)
+            session["AVALON_LAST_WORKFILE"] = last_workfile_path
+
         # dynamic environmnets
         tools_attr = []
         if session["AVALON_APP"] is not None:
