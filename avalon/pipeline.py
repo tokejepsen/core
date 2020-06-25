@@ -392,7 +392,6 @@ class Application(Action):
             )
 
         if last_workfile_path:
-            print(last_workfile_path)
             session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
