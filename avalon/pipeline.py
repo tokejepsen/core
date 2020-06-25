@@ -1691,19 +1691,31 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
 def last_workfile(
     workdir, file_template, fill_data, extensions, full_path=False
 ):
-    """Return last workfile name.
+    """Return last workfile filename.
 
     Returns file with version 1 if there is not workfile yet.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+        full_path(bool): Full path to file is returned if set to True.
+
+    Returns:
+        str: Last or first workfile as filename of full path to filename.
     """
-    version = last_workfile_version(
+    filename, version = last_workfile_with_version(
         workdir, file_template, fill_data, extensions
     )
-    if version is None:
-        version = 1
-    data = copy.deepcopy(fill_data)
-    data["version"] = version
+    if filename is None:
+        data = copy.deepcopy(fill_data)
+        data["version"] = 1
+        data.pop("comment", None)
+        if not data.get("ext"):
+            data["ext"] = extensions[0]
+        filename = format_template_with_optional_keys(data, file_template)
 
-    output = format_template_with_optional_keys(data, file_template)
     if full_path:
-        output = os.path.join(workdir, output)
-    return output
+        return os.path.join(workdir, filename)
+    return filename
