@@ -14,12 +14,7 @@ def has_unsaved_changes():
 
 def save_file(filepath):
     cmds.file(rename=filepath)
-    ext = os.path.splitext(filepath)[1]
-    if ext == ".ma":
-        file_type = "mayaAscii"
-    elif ext == ".mb":
-        file_type = "mayaBinary"
-    cmds.file(save=True, type=file_type)
+    cmds.file(save=True, type="mayaAscii")
 
 
 def open_file(filepath):
