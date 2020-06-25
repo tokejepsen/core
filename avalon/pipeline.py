@@ -1620,3 +1620,67 @@ def loaders_from_representation(loaders, representation):
 
     context = get_representation_context(representation)
     return [l for l in loaders if is_compatible_loader(l, context)]
+
+
+def last_workfile_version(workdir, file_template, fill_data, extensions):
+    """Return last workfile version.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+
+    Returns:
+        int: Last workfile version if there is any.
+        None: If workdir does not exist or there is not existing workfile yet.
+    """
+    if not os.path.exists(workdir):
+        return None
+
+    # Fast match on extension
+    filenames = [
+        filename
+        for filename in os.listdir(workdir)
+        if os.path.splitext(filename)[1] in extensions
+    ]
+
+    # Build template without optionals, version to digits only regex
+    # and comment to any definable value.
+    file_template = re.sub("<.*?>", ".*?", file_template)
+    file_template = re.sub("{version.*}", "([0-9]+)", file_template)
+    file_template = re.sub("{comment.*?}", ".+?", file_template)
+    partially_filled = format_template_with_optional_keys(
+        fill_data,
+        file_template
+    )
+
+    _ext = []
+    for ext in extensions:
+        if not ext.startswith("."):
+            ext = "." + ext
+        # Escape dot for regex
+        ext = "\\" + ext
+        _ext.append(ext)
+
+    # Add or regex expression for extensions
+    partially_filled += "(?:" + "|".join(_ext) + ")"
+    file_template = "^" + partially_filled + "$"
+
+    # Match with ignore case on Windows due to the Windows
+    # OS not being case-sensitive. This avoids later running
+    # into the error that the file did exist if it existed
+    # with a different upper/lower-case.
+    kwargs = {}
+    if platform.system().lower() == "windows":
+        kwargs["flags"] = re.IGNORECASE
+
+    # Get highest version among existing matching files
+    version = None
+    for filename in sorted(filenames):
+        match = re.match(file_template, filename, **kwargs)
+        if match:
+            file_version = int(match.group(1))
+            if version is None or file_version >= version:
+                version = file_version
+    return version
