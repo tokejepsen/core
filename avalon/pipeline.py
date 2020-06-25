@@ -1632,11 +1632,11 @@ def last_workfile_version(workdir, file_template, fill_data, extensions):
         extensions(list, tuple): All allowed file extensions of workfile.
 
     Returns:
-        int: Last workfile version if there is any.
-        None: If workdir does not exist or there is not existing workfile yet.
+        tuple: Last workfile<str> with version<int> if there is any otherwise
+            returns (None, None).
     """
     if not os.path.exists(workdir):
-        return None
+        return None, None
 
     # Fast match on extension
     filenames = [
@@ -1676,6 +1676,7 @@ def last_workfile_version(workdir, file_template, fill_data, extensions):
         kwargs["flags"] = re.IGNORECASE
 
     # Get highest version among existing matching files
+    output_filename = None
     version = None
     for filename in sorted(filenames):
         match = re.match(file_template, filename, **kwargs)
@@ -1683,7 +1684,8 @@ def last_workfile_version(workdir, file_template, fill_data, extensions):
             file_version = int(match.group(1))
             if version is None or file_version >= version:
                 version = file_version
-    return version
+                output_filename = filename
+    return output_filename, version
 
 
 def last_workfile(
