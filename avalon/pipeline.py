@@ -1686,7 +1686,9 @@ def last_workfile_version(workdir, file_template, fill_data, extensions):
     return version
 
 
-def last_workfile(workdir, file_template, fill_data, extensions):
+def last_workfile(
+    workdir, file_template, fill_data, extensions, full_path=False
+):
     """Return last workfile name.
 
     Returns file with version 1 if there is not workfile yet.
@@ -1699,4 +1701,7 @@ def last_workfile(workdir, file_template, fill_data, extensions):
     data = copy.deepcopy(fill_data)
     data["version"] = version
 
-    return format_template_with_optional_keys(data, file_template)
+    output = format_template_with_optional_keys(data, file_template)
+    if full_path:
+        output = os.path.join(workdir, output)
+    return output
