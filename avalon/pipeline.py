@@ -1684,3 +1684,19 @@ def last_workfile_version(workdir, file_template, fill_data, extensions):
             if version is None or file_version >= version:
                 version = file_version
     return version
+
+
+def last_workfile(workdir, file_template, fill_data, extensions):
+    """Return last workfile name.
+
+    Returns file with version 1 if there is not workfile yet.
+    """
+    version = last_workfile_version(
+        workdir, file_template, fill_data, extensions
+    )
+    if version is None:
+        version = 1
+    data = copy.deepcopy(fill_data)
+    data["version"] = version
+
+    return format_template_with_optional_keys(data, file_template)
