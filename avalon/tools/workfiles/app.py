@@ -1,10 +1,9 @@
 import sys
 import os
+import copy
 import getpass
-import re
 import shutil
 import logging
-import platform
 
 from ...vendor.Qt import QtWidgets, QtCore
 from ... import style, io, api, pipeline
@@ -144,11 +143,8 @@ class NameWindow(QtWidgets.QDialog):
         return self.result
 
     def get_work_file(self, template=None):
-        data = self.data.copy()
+        data = copy.deepcopy(self.data)
         template = template or self.template
-
-        if not data["comment"]:
-            data.pop("comment", None)
 
         # Define saving file extension
         current_file = self.host.current_file()
@@ -161,38 +157,12 @@ class NameWindow(QtWidgets.QDialog):
 
         data["ext"] = extension
 
-        # Remove optional missing keys
-        pattern = re.compile(r"<.*?>")
-        invalid_optionals = []
-        for group in pattern.findall(template):
-            try:
-                group.format(**data)
-            except KeyError:
-                invalid_optionals.append(group)
+        if not data["comment"]:
+            data.pop("comment", None)
 
-        for group in invalid_optionals:
-            template = template.replace(group, "")
-
-        work_file = template.format(**data)
-
-        if not work_file.endswith(extension):
-            if not extension.startswith("."):
-                extension = "." + extension
-
-            work_file += extension
-
-        # Remove optional symbols
-        work_file = (
-            work_file
-            .replace("<", "")
-            .replace(">", "")
-            .replace("..", ".")
-        )
-
-        return work_file
+        return api.format_template_with_optional_keys(data, template)
 
     def refresh(self):
-
         # Since the version can be padded with "{version:0>4}" we only search
         # for "{version".
         if "{version" not in self.template:
@@ -207,42 +177,21 @@ class NameWindow(QtWidgets.QDialog):
         if self.widgets["versionCheck"].isChecked():
             self.widgets["versionValue"].setEnabled(False)
 
-            # Find matching files
-            files = os.listdir(self.root) if os.path.exists(self.root) else []
-
-            # Fast match on extension
             extensions = self.host.file_extensions()
-            files = [f for f in files if os.path.splitext(f)[1] in extensions]
+            data = copy.deepcopy(self.data)
+            template = str(self.template)
 
-            # Build template without optionals, version to digits only regex
-            # and comment to any definable value.
-            # Note: with auto-increment the `version` key may not be optional.
-            template = self.template
-            template = re.sub("<.*?>", ".*?", template)
-            template = re.sub("{version.*}", "([0-9]+)", template)
-            template = re.sub("{comment.*?}", ".+?", template)
-            template = self.get_work_file(template)
-            template = "^" + template + "$"           # match beginning to end
+            if not data["comment"]:
+                data.pop("comment", None)
 
-            # Match with ignore case on Windows due to the Windows
-            # OS not being case-sensitive. This avoids later running
-            # into the error that the file did exist if it existed
-            # with a different upper/lower-case.
-            kwargs = {}
-            if platform.system() == "Windows":
-                kwargs["flags"] = re.IGNORECASE
+            version = api.last_workfile_version(
+                self.root, template, data, extensions
+            )
 
-            # Get highest version among existing matching files
-            version = 1
-            for file in sorted(files):
-                match = re.match(template, file, **kwargs)
-                if not match:
-                    continue
-
-                file_version = int(match.group(1))
-
-                if file_version >= version:
-                    version = file_version + 1
+            if version is None:
+                version = 1
+            else:
+                version += 1
 
             self.data["version"] = version
 
