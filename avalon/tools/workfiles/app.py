@@ -184,9 +184,9 @@ class NameWindow(QtWidgets.QDialog):
             if not data["comment"]:
                 data.pop("comment", None)
 
-            version = api.last_workfile_version(
+            version = api.last_workfile_with_version(
                 self.root, template, data, extensions
-            )
+            )[1]
 
             if version is None:
                 version = 1

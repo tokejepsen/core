@@ -59,7 +59,7 @@ from .pipeline import (
 
     HOST_WORKFILE_EXTENSIONS,
     format_template_with_optional_keys,
-    last_workfile_version,
+    last_workfile_with_version,
     last_workfile
 )
 
@@ -117,7 +117,7 @@ __all__ = [
 
     "HOST_WORKFILE_EXTENSIONS",
     "format_template_with_optional_keys",
-    "last_workfile_version",
+    "last_workfile_with_version",
     "last_workfile",
 
     "logger",

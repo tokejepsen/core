@@ -1622,7 +1622,7 @@ def loaders_from_representation(loaders, representation):
     return [l for l in loaders if is_compatible_loader(l, context)]
 
 
-def last_workfile_version(workdir, file_template, fill_data, extensions):
+def last_workfile_with_version(workdir, file_template, fill_data, extensions):
     """Return last workfile version.
 
     Args:
