@@ -54,7 +54,8 @@ HOST_WORKFILE_EXTENSIONS = {
     "nuke": [".nk"],
     "nukestudio": [".hrox"],
     "photoshop": [".psd"],
-    "premiere": [".prproj"]
+    "premiere": [".prproj"],
+    "resolve": [".drp"]
 }
 
 
