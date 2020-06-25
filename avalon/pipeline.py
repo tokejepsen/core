@@ -45,6 +45,18 @@ log = logging.getLogger(__name__)
 
 AVALON_CONTAINER_ID = "pyblish.avalon.container"
 
+HOST_WORKFILE_EXTENSIONS = {
+    "blender": [".blend"],
+    "fusion": [".comp"],
+    "harmony": [".zip"],
+    "houdini": [".hip", ".hiplc", ".hipnc"],
+    "maya": [".ma", ".mb"],
+    "nuke": [".nk"],
+    "nukestudio": [".hrox"],
+    "photoshop": [".psd"],
+    "premiere": [".prproj"]
+}
+
 
 class IncompatibleLoaderError(ValueError):
     """Error when Loader is incompatible with a representation."""
