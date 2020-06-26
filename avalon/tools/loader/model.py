@@ -478,7 +478,7 @@ class SubsetsModel(TreeModel):
 
             merge_group_index = self.createIndex(0, 0, merge_group)
 
-            for asset_id, asset_subset_data in per_asset_data.items():
+            for asset_subset_data in per_asset_data.values():
                 last_version = asset_subset_data["last_version"]
                 data = asset_subset_data["data"]
 
