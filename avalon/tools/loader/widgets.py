@@ -29,15 +29,15 @@ class SubsetWidget(QtWidgets.QWidget):
     version_changed = QtCore.Signal()   # version state changed for a subset
 
     default_widths = (
-        ("subset", 180),
-        ("asset", 180),
-        ("family", 80),
+        ("subset", 190),
+        ("asset", 130),
+        ("family", 90),
         ("version", 60),
         ("time", 120),
-        ("author", 80),
+        ("author", 85),
         ("frames", 80),
         ("duration", 60),
-        ("handles", 50),
+        ("handles", 55),
         ("step", 50)
     )
 
