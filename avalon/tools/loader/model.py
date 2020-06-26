@@ -343,7 +343,9 @@ class SubsetsModel(TreeModel):
             if result:
                 active_groups.extend(result)
 
-        asset_docs_by_id = self._doc_payload.get("asset_docs_by_id")
+        asset_docs_by_id = self._doc_payload.get(
+            "asset_docs_by_id"
+        )
         subset_docs_by_id = self._doc_payload.get(
             "subset_docs_by_id"
         )
@@ -499,6 +501,7 @@ class SubsetsModel(TreeModel):
 
             data = subset_doc.copy()
             data["subset"] = subset_doc["name"]
+            data["asset"] = asset_docs_by_id[subset_doc["parent"]]["name"]
 
             group_name = subset_doc["data"].get("subsetGroup")
             if process_only_single_asset:
