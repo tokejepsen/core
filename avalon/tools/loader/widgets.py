@@ -3,11 +3,12 @@ import datetime
 import pprint
 import inspect
 
-from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtCompat
+from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg, QtCompat
 from ...vendor import qtawesome
 from ... import io
 from ... import api
 from ... import pipeline
+from ... import style
 from ...lib import MasterVersionType
 
 from .. import lib as tools_lib
@@ -45,7 +46,7 @@ class SubsetWidget(QtWidgets.QWidget):
         top_bar_layout.addWidget(filter)
         top_bar_layout.addWidget(groupable)
 
-        view = QtWidgets.QTreeView()
+        view = SubsetTreeView()
         view.setObjectName("SubsetView")
         view.setIndentation(20)
         view.setStyleSheet("""
@@ -129,6 +130,18 @@ class SubsetWidget(QtWidgets.QWidget):
                                           current_index=False):
             self.model.set_grouping(state)
 
+    def set_loading_state(self, loading, empty):
+        view = self.view
+
+        if view.is_loading != loading:
+            if loading:
+                view.spinner.repaintNeeded.connect(view.viewport().update)
+            else:
+                view.spinner.repaintNeeded.disconnect()
+
+        view.is_loading = loading
+        view.is_empty = empty
+
     def on_context_menu(self, point):
         """Shows menu with loader actions on Right-click.
 
@@ -155,7 +168,8 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
 
             elif item.get("isMerged"):
-                # TODO use `for` loop of index's rowCount instead of `while` loop
+                # TODO use `for` loop of index's rowCount
+                # instead of `while` loop
                 idx = 0
                 while idx < 2000:
                     child_index = row_index.child(idx, 0)
@@ -402,6 +416,44 @@ class SubsetWidget(QtWidgets.QWidget):
         print(message)
 
 
+class SubsetTreeView(QtWidgets.QTreeView):
+
+    def __init__(self, parent=None):
+        super(SubsetTreeView, self).__init__(parent=parent)
+        loading_gif = os.path.dirname(style.__file__) + "/svg/spinner-200.svg"
+        spinner = QtSvg.QSvgRenderer(loading_gif)
+        self.spinner = spinner
+        self.is_loading = False
+        self.is_empty = True
+
+    def paint_loading(self, event):
+        size = 160
+        rect = event.rect()
+        rect = QtCore.QRectF(rect.topLeft(), rect.bottomRight())
+        rect.moveTo(rect.x() + rect.width() / 2 - size / 2,
+                    rect.y() + rect.height() / 2 - size / 2)
+        rect.setSize(QtCore.QSizeF(size, size))
+        painter = QtGui.QPainter(self.viewport())
+        self.spinner.render(painter, rect)
+
+    def paint_empty(self, event):
+        painter = QtGui.QPainter(self.viewport())
+        rect = event.rect()
+        rect = QtCore.QRectF(rect.topLeft(), rect.bottomRight())
+        qtext_opt = QtGui.QTextOption(
+            QtCore.Qt.AlignHCenter | QtCore.Qt.AlignVCenter
+        )
+        painter.drawText(rect, "No Data", qtext_opt)
+
+    def paintEvent(self, event):
+        if self.is_loading:
+            self.paint_loading(event)
+        elif self.is_empty:
+            self.paint_empty(event)
+        else:
+            super(SubsetTreeView, self).paintEvent(event)
+
+
 class VersionTextEdit(QtWidgets.QTextEdit):
     """QTextEdit that displays version specific information.
 
@@ -422,7 +474,6 @@ class VersionTextEdit(QtWidgets.QTextEdit):
         self.set_version(None)
 
     def set_version(self, version_doc=None, version_id=None):
-
         if not version_doc and not version_id:
             # Reset state to empty
             self.data = {
