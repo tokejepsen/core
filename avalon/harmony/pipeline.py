@@ -25,7 +25,7 @@ def ls():
         dict: container
     """
     objects = lib.get_scene_data()
-    for id, data in objects.items():
+    for _, data in objects.items():
         # Skip non-tagged objects.
         if not data:
             continue
