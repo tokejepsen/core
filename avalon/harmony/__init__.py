@@ -19,7 +19,8 @@ from .lib import (
     send,
     maintained_nodes_state,
     save_scene,
-    save_scene_as
+    save_scene_as,
+    remove
 )
 
 from .workio import (
@@ -47,6 +48,7 @@ __all__ = [
     "maintained_nodes_state",
     "save_scene",
     "save_scene_as",
+    "remove",
 
     # Workfiles API
     "open_file",

@@ -24,23 +24,15 @@ def ls():
     Yields:
         dict: container
     """
-    read_nodes = lib.send(
-        {"function": "node.getNodes", "args": [["READ"]]}
-    )["result"]
-
-    for node in read_nodes:
-        data = lib.read(node)
-
-        # Skip non-tagged layers.
+    objects = lib.get_scene_data()
+    for id, data in objects.items():
+        # Skip non-tagged objects.
         if not data:
             continue
 
         # Filter to only containers.
         if "container" not in data["id"]:
             continue
-
-        # Append transient data
-        data["node"] = node
 
         yield data
 
@@ -160,15 +152,13 @@ def containerise(name,
     Returns:
         container (str): Path of container assembly.
     """
-    lib.send({"function": "node.rename", "args": [node, name + suffix]})
-
     data = {
         "schema": "avalon-core:container-2.0",
         "id": pipeline.AVALON_CONTAINER_ID,
         "name": name,
         "namespace": namespace,
         "loader": str(loader),
-        "representation": str(context["representation"]["_id"]),
+        "representation": str(context["representation"]["_id"])
     }
 
     lib.imprint(node, data)
