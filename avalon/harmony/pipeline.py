@@ -135,7 +135,7 @@ def containerise(name,
                  node,
                  context,
                  loader=None,
-                 suffix="_CON"):
+                 suffix=None):
     """Imprint node with metadata.
 
     Containerisation enables a tracking of version, author and origin

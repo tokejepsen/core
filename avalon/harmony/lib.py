@@ -205,6 +205,9 @@ def get_scene_data():
     except json.decoder.JSONDecodeError:
         # Means no sceen metadata has been made before.
         return {}
+    except KeyError:
+        # Means no existing scene metadata has been made.
+        return {}
 
 
 def set_scene_data(data):
@@ -233,32 +236,11 @@ def read(node_id):
     Returns:
         dict
     """
-    data = {}
-
-    # Query old style node attributes.
-    func = """function read(node_path)
-    {
-        return node.getTextAttr(node_path, 1.0, "avalon");
-    }
-    read
-    """
-    if node_id.startswith("Top/"):
-        try:
-            data = json.loads(
-                self.send({"function": func, "args": [node_id]})["result"]
-            )
-        except json.decoder.JSONDecodeError:
-            pass
-        except KeyError:
-            pass
-
-    # Query new style scene metadata.
     scene_data = get_scene_data()
-    if not data:
-        if node_id in scene_data:
-            data = scene_data[node_id]
+    if node_id in get_scene_data():
+        return scene_data[node_id]
 
-    return data
+    return {}
 
 
 def remove(node_id):
@@ -281,18 +263,12 @@ def imprint(node_id, data, remove=False):
         >>> data = {"str": "someting", "int": 1, "float": 0.32, "bool": True}
         >>> lib.imprint(layer, data)
     """
-
-    # Ensure we get existing old style data
-    existing_data = read(node_id)
-    existing_data.update(data)
-
-    # Read existing scene data.
     scene_data = get_scene_data()
 
     if node_id in scene_data:
-        scene_data[node_id].update(existing_data)
+        scene_data[node_id].update(data)
     else:
-        scene_data[node_id] = existing_data
+        scene_data[node_id] = data
 
     set_scene_data(scene_data)
 
@@ -449,3 +425,15 @@ def save_scene_as(filepath):
     send(
         {"function": func, "args": [filepath]}
     )
+
+
+def find_node_by_name(name, node_type):
+    nodes = send(
+        {"function": "node.getNodes", "args": [[node_type]]}
+    )["result"]
+    for node in nodes:
+        node_name = node.split("/")[-1]
+        if name == node_name:
+            return node
+
+    return None
