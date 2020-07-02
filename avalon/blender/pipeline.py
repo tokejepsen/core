@@ -272,7 +272,7 @@ def containerise_existing(
 
     node_name = container.name
     if namespace:
-        node_name = f"{namespace}:{node_name}"
+        node_name = f"{namespace:0>2}:{node_name}"
     if suffix:
         node_name = f"{node_name}_{suffix}"
     container.name = node_name
