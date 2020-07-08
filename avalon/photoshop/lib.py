@@ -101,6 +101,10 @@ def launch(application):
         if photoshop.app():
             workfiles.show(save=False)
 
+    # Wait for Photoshop launch.
+    if photoshop.app():
+        api.emit("application.launched")
+
     self.callback_queue = queue.Queue()
     while True:
         main_thread_listen()
