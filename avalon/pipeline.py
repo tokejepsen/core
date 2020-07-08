@@ -45,6 +45,19 @@ log = logging.getLogger(__name__)
 
 AVALON_CONTAINER_ID = "pyblish.avalon.container"
 
+HOST_WORKFILE_EXTENSIONS = {
+    "blender": [".blend"],
+    "fusion": [".comp"],
+    "harmony": [".zip"],
+    "houdini": [".hip", ".hiplc", ".hipnc"],
+    "maya": [".ma", ".mb"],
+    "nuke": [".nk"],
+    "nukestudio": [".hrox"],
+    "photoshop": [".psd"],
+    "premiere": [".prproj"],
+    "resolve": [".drp"]
+}
+
 
 class IncompatibleLoaderError(ValueError):
     """Error when Loader is incompatible with a representation."""
@@ -358,6 +371,28 @@ class Application(Action):
         template_data = template_data_from_session(session)
         anatomy_filled = anatomy.format(template_data)
         session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
+
+        last_workfile_path = None
+        extensions = HOST_WORKFILE_EXTENSIONS.get(session["AVALON_APP"])
+        if extensions:
+            # Find last workfile
+            file_template = anatomy.templates["work"]["file"]
+            template_data.update({
+                "version": 1,
+                "user": getpass.getuser(),
+                "ext": extensions[0]
+            })
+
+            last_workfile_path = last_workfile(
+                session["AVALON_WORKDIR"],
+                file_template,
+                template_data,
+                extensions,
+                True
+            )
+
+        if last_workfile_path:
+            session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
         tools_attr = []
@@ -1608,3 +1643,102 @@ def loaders_from_representation(loaders, representation):
 
     context = get_representation_context(representation)
     return [l for l in loaders if is_compatible_loader(l, context)]
+
+
+def last_workfile_with_version(workdir, file_template, fill_data, extensions):
+    """Return last workfile version.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+
+    Returns:
+        tuple: Last workfile<str> with version<int> if there is any otherwise
+            returns (None, None).
+    """
+    if not os.path.exists(workdir):
+        return None, None
+
+    # Fast match on extension
+    filenames = [
+        filename
+        for filename in os.listdir(workdir)
+        if os.path.splitext(filename)[1] in extensions
+    ]
+
+    # Build template without optionals, version to digits only regex
+    # and comment to any definable value.
+    file_template = re.sub("<.*?>", ".*?", file_template)
+    file_template = re.sub("{version.*}", "([0-9]+)", file_template)
+    file_template = re.sub("{comment.*?}", ".+?", file_template)
+    partially_filled = format_template_with_optional_keys(
+        fill_data,
+        file_template
+    )
+
+    _ext = []
+    for ext in extensions:
+        if not ext.startswith("."):
+            ext = "." + ext
+        # Escape dot for regex
+        ext = "\\" + ext
+        _ext.append(ext)
+
+    # Add or regex expression for extensions
+    partially_filled += "(?:" + "|".join(_ext) + ")"
+    file_template = "^" + partially_filled + "$"
+
+    # Match with ignore case on Windows due to the Windows
+    # OS not being case-sensitive. This avoids later running
+    # into the error that the file did exist if it existed
+    # with a different upper/lower-case.
+    kwargs = {}
+    if platform.system().lower() == "windows":
+        kwargs["flags"] = re.IGNORECASE
+
+    # Get highest version among existing matching files
+    output_filename = None
+    version = None
+    for filename in sorted(filenames):
+        match = re.match(file_template, filename, **kwargs)
+        if match:
+            file_version = int(match.group(1))
+            if version is None or file_version >= version:
+                version = file_version
+                output_filename = filename
+    return output_filename, version
+
+
+def last_workfile(
+    workdir, file_template, fill_data, extensions, full_path=False
+):
+    """Return last workfile filename.
+
+    Returns file with version 1 if there is not workfile yet.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+        full_path(bool): Full path to file is returned if set to True.
+
+    Returns:
+        str: Last or first workfile as filename of full path to filename.
+    """
+    filename, version = last_workfile_with_version(
+        workdir, file_template, fill_data, extensions
+    )
+    if filename is None:
+        data = copy.deepcopy(fill_data)
+        data["version"] = 1
+        data.pop("comment", None)
+        if not data.get("ext"):
+            data["ext"] = extensions[0]
+        filename = format_template_with_optional_keys(data, file_template)
+
+    if full_path:
+        return os.path.join(workdir, filename)
+    return filename

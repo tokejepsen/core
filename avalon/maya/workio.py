@@ -1,11 +1,11 @@
 """Host API required Work Files tool"""
 import os
-
 from maya import cmds
+from avalon import api
 
 
 def file_extensions():
-    return [".ma", ".mb"]
+    return api.HOST_WORKFILE_EXTENSIONS["maya"]
 
 
 def has_unsaved_changes():

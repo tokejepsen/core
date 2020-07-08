@@ -56,6 +56,11 @@ from .pipeline import (
 
     deregister_plugin,
     deregister_plugin_path,
+
+    HOST_WORKFILE_EXTENSIONS,
+    format_template_with_optional_keys,
+    last_workfile_with_version,
+    last_workfile
 )
 
 from .lib import (
@@ -109,6 +114,11 @@ __all__ = [
 
     "deregister_plugin",
     "deregister_plugin_path",
+
+    "HOST_WORKFILE_EXTENSIONS",
+    "format_template_with_optional_keys",
+    "last_workfile_with_version",
+    "last_workfile",
 
     "logger",
     "time",

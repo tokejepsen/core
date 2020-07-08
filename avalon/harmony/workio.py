@@ -3,10 +3,11 @@ import os
 import shutil
 
 from . import lib
+from avalon import api
 
 
 def file_extensions():
-    return [".zip"]
+    return api.HOST_WORKFILE_EXTENSIONS["harmony"]
 
 
 def has_unsaved_changes():
