@@ -4,6 +4,8 @@ import json
 import traceback
 import importlib
 import functools
+import time
+from datetime import datetime
 
 from . import lib
 
@@ -14,6 +16,7 @@ class Server(object):
         self.connection = None
         self.received = ""
         self.port = port
+        self.mId = 1
 
         # Setup logging.
         self.log = logging.getLogger(__name__)
@@ -29,9 +32,11 @@ class Server(object):
 
         # Listen for incoming connections
         self.socket.listen(1)
+        self.queue = {}
 
     def process_request(self, request):
-        """
+        """Process incoming request.
+
         Args:
             request (dict): {
                 "module": (str),  # Module of method.
@@ -41,7 +46,8 @@ class Server(object):
                 "reply" (bool),  # Optional wait for method completion.
             }
         """
-        self.log.debug("Processing request: {}".format(request))
+        ts = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug("Processing request [{}]: {}".format(ts, request))
 
         try:
             module = importlib.import_module(request["module"])
@@ -61,21 +67,28 @@ class Server(object):
         When the data is a json serializable string, a reply is sent then
         processing of the request.
         """
-
+        current_time = time.time()
         while True:
+
             # Receive the data in small chunks and retransmit it
             request = None
             while True:
+                time.sleep(0.1)
+                if time.time() > current_time + 30:
+                    self.log.error("Connection timeout.")
+                    break
                 if self.connection is None:
                     break
 
                 data = self.connection.recv(4096)
                 if data:
                     self.received += data.decode("utf-8")
+                    current_time = time.time()
                 else:
                     break
 
-                self.log.debug("Received: {}".format(self.received))
+                ts = datetime.now().strftime("%H:%M:%S.%f")
+                self.log.debug("Received [{}]: {}".format(ts, self.received))
 
                 try:
                     request = json.loads(self.received)
@@ -87,20 +100,33 @@ class Server(object):
                 break
 
             self.received = ""
-
-            self.log.debug("Request: {}".format(request))
+            ts = datetime.now().strftime("%H:%M:%S.%f")
+            self.log.debug("Request [{}]: {}".format(ts, request))
+            if "mId" in request.keys():
+                self.log.debug("--- storing request as {}".format(
+                    request["mId"]))
+                self.queue[request["mId"]] = request
             if "reply" not in request.keys():
                 request["reply"] = True
+                self.log.debug("Sending reply ...")
                 self._send(json.dumps(request))
-
+                self.log.debug("Processing request ...")
                 self.process_request(request)
+                self.log.debug("Removing from queue {}".format(request["mId"]))
+                if "mId" in request.keys():
+                    try:
+                        del self.queue[request["mId"]]
+                    except IndexError:
+                        self.log.debug("{} is no longer in queue".format(
+                            request["mId"]))
+            else:
+                self.log.debug("Recieved data was just reply.")
 
     def start(self):
         """Entry method for server.
 
         Waits for a connection on `self.port` before going into listen mode.
         """
-
         # Wait for a connection
         self.log.debug("Waiting for a connection.")
         self.connection, client_address = self.socket.accept()
@@ -128,13 +154,14 @@ class Server(object):
         Args:
             message (str): Data to send to Harmony.
         """
-
         # Wait for a connection.
         while not self.connection:
             pass
 
-        self.log.debug("Sending: {}".format(message))
+        ts = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug("Sending [{}][{}]: {}".format(self.mId, ts, message))
         self.connection.sendall(message.encode("utf-8"))
+        self.mId += 1
 
     def send(self, request):
         """Send a request in dictionary to Harmony.
@@ -144,10 +171,33 @@ class Server(object):
         Args:
             request (dict): Data to send to Harmony.
         """
+        request["mId"] = self.mId
         self._send(json.dumps(request))
-
+        if request.get("reply"):
+            self.log.debug("sent reply, not waiting for anything.")
+            return None
         result = None
+        current_time = time.time()
+        it = 1
         while True:
+            time.sleep(0.1)
+            if time.time() > current_time + 30:
+                ts = datetime.now().strftime("%H:%M:%S.%f")
+                self.log.error(("[{}][{}] No reply from Harmony in 30s. "
+                                "Retrying {}").format(request["mId"], ts, it))
+                it += 1
+                current_time = time.time()
+            if it > 4:
+                break
+            try:
+                result = self.queue[request["mId"]]
+                self.log.debug(("  - got request id {}, "
+                                "removing from queue").format(request["mId"]))
+                del self.queue[request["mId"]]
+                break
+            except KeyError:
+                # response not in recieved queue yey
+                pass
             try:
                 result = json.loads(self.received)
                 break
