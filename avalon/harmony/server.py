@@ -112,9 +112,11 @@ class Server(object):
                 self._send(json.dumps(request))
                 self.log.debug("Processing request ...")
                 self.process_request(request)
-                self.log.debug("Removing from queue {}".format(request["mId"]))
+
                 if "mId" in request.keys():
                     try:
+                        self.log.debug("Removing from queue {}".format(
+                            request["mId"]))
                         del self.queue[request["mId"]]
                     except IndexError:
                         self.log.debug("{} is no longer in queue".format(
