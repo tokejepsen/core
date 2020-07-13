@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+"""Server-side implementation of Toon Boon Harmony communication."""
 import socket
 import logging
 import json
@@ -11,12 +13,23 @@ from . import lib
 
 
 class Server(object):
+    """Class for communication with Toon Boon Harmony.
+
+    Attributes:
+        connection (Socket): connection holding object.
+        recieved (str): recieved data buffer.any(iterable)
+        port (int): port number.
+        message_id (int): index of last message going out.
+        queue (dict): dictionary holding queue of incoming messages.
+
+    """
 
     def __init__(self, port):
+        """Constructor."""
         self.connection = None
         self.received = ""
         self.port = port
-        self.mId = 1
+        self.message_id = 1
 
         # Setup logging.
         self.log = logging.getLogger(__name__)
@@ -46,8 +59,9 @@ class Server(object):
                 "reply" (bool),  # Optional wait for method completion.
             }
         """
-        ts = datetime.now().strftime("%H:%M:%S.%f")
-        self.log.debug("Processing request [{}]: {}".format(ts, request))
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug(
+            "Processing request [{}]: {}".format(timestamp, request))
 
         try:
             module = importlib.import_module(request["module"])
@@ -87,8 +101,9 @@ class Server(object):
                 else:
                     break
 
-                ts = datetime.now().strftime("%H:%M:%S.%f")
-                self.log.debug("Received [{}]: {}".format(ts, self.received))
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")
+                self.log.debug(
+                    "Received [{}]: {}".format(timestamp, self.received))
 
                 try:
                     request = json.loads(self.received)
@@ -100,12 +115,12 @@ class Server(object):
                 break
 
             self.received = ""
-            ts = datetime.now().strftime("%H:%M:%S.%f")
-            self.log.debug("Request [{}]: {}".format(ts, request))
-            if "mId" in request.keys():
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")
+            self.log.debug("Request [{}]: {}".format(timestamp, request))
+            if "message_id" in request.keys():
                 self.log.debug("--- storing request as {}".format(
-                    request["mId"]))
-                self.queue[request["mId"]] = request
+                    request["message_id"]))
+                self.queue[request["message_id"]] = request
             if "reply" not in request.keys():
                 request["reply"] = True
                 self.log.debug("Sending reply ...")
@@ -113,14 +128,14 @@ class Server(object):
                 self.log.debug("Processing request ...")
                 self.process_request(request)
 
-                if "mId" in request.keys():
+                if "message_id" in request.keys():
                     try:
                         self.log.debug("Removing from queue {}".format(
-                            request["mId"]))
-                        del self.queue[request["mId"]]
+                            request["message_id"]))
+                        del self.queue[request["message_id"]]
                     except IndexError:
                         self.log.debug("{} is no longer in queue".format(
-                            request["mId"]))
+                            request["message_id"]))
             else:
                 self.log.debug("Recieved data was just reply.")
 
@@ -138,6 +153,7 @@ class Server(object):
         self.receive()
 
     def stop(self):
+        """Shutdown socket server gracefully."""
         self.log.debug("Shutting down server.")
         if self.connection is None:
             self.log.debug("Connect to shutdown.")
@@ -160,10 +176,11 @@ class Server(object):
         while not self.connection:
             pass
 
-        ts = datetime.now().strftime("%H:%M:%S.%f")
-        self.log.debug("Sending [{}][{}]: {}".format(self.mId, ts, message))
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug(
+            "Sending [{}][{}]: {}".format(self.message_id, timestamp, message))
         self.connection.sendall(message.encode("utf-8"))
-        self.mId += 1
+        self.message_id += 1
 
     def send(self, request):
         """Send a request in dictionary to Harmony.
@@ -173,29 +190,31 @@ class Server(object):
         Args:
             request (dict): Data to send to Harmony.
         """
-        request["mId"] = self.mId
+        request["message_id"] = self.message_id
         self._send(json.dumps(request))
         if request.get("reply"):
             self.log.debug("sent reply, not waiting for anything.")
             return None
         result = None
         current_time = time.time()
-        it = 1
+        try_index = 1
         while True:
             time.sleep(0.1)
             if time.time() > current_time + 30:
-                ts = datetime.now().strftime("%H:%M:%S.%f")
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")
                 self.log.error(("[{}][{}] No reply from Harmony in 30s. "
-                                "Retrying {}").format(request["mId"], ts, it))
-                it += 1
+                                "Retrying {}").format(request["message_id"],
+                                                      timestamp, try_index))
+                try_index += 1
                 current_time = time.time()
-            if it > 4:
+            if try_index > 4:
                 break
             try:
-                result = self.queue[request["mId"]]
+                result = self.queue[request["message_id"]]
                 self.log.debug(("  - got request id {}, "
-                                "removing from queue").format(request["mId"]))
-                del self.queue[request["mId"]]
+                                "removing from queue").format(
+                                    request["message_id"]))
+                del self.queue[request["message_id"]]
                 break
             except KeyError:
                 # response not in recieved queue yey
