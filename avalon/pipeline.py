@@ -391,7 +391,7 @@ class Application(Action):
                 True
             )
 
-        if last_workfile_path:
+        if last_workfile_path and os.path.exists(last_workfile_path):
             session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
