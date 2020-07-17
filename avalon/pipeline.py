@@ -188,7 +188,13 @@ class Loader(list):
 
     def __init__(self, context):
         representation = context['representation']
-        self.fname = get_representation_path(representation)
+        project_doc = context.get("project")
+        root = None
+        if project_doc and project_doc["name"] != Session["AVALON_PROJECT"]:
+            anatomy = Anatomy(project_doc["name"])
+            root = anatomy.roots_obj
+
+        self.fname = get_representation_path(representation, root)
 
     def load(self, context, name=None, namespace=None, options=None):
         """Load asset via database
