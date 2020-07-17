@@ -358,6 +358,11 @@ class DbConnector(object):
             *args, **kwargs)
 
     @auto_reconnect
+    def aggregate(self, *args, **kwargs):
+        return self._database[self.Session["AVALON_PROJECT"]].aggregate(
+            *args, **kwargs)
+
+    @auto_reconnect
     def drop(self, *args, **kwargs):
         return self._database[self.Session["AVALON_PROJECT"]].drop(
             *args, **kwargs)
