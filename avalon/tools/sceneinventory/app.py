@@ -260,6 +260,9 @@ class View(QtWidgets.QTreeView):
             lambda: self.show_remove_warning_dialog(items))
 
         # add the actions
+        if switch_to_versioned:
+            menu.addAction(switch_to_versioned)
+
         if update_to_latest_action:
             menu.addAction(update_to_latest_action)
 
