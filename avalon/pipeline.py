@@ -13,6 +13,7 @@ import logging
 import weakref
 import inspect
 import traceback
+import platform
 import importlib
 
 from collections import OrderedDict
@@ -43,6 +44,19 @@ log = logging.getLogger(__name__)
 
 
 AVALON_CONTAINER_ID = "pyblish.avalon.container"
+
+HOST_WORKFILE_EXTENSIONS = {
+    "blender": [".blend"],
+    "fusion": [".comp"],
+    "harmony": [".zip"],
+    "houdini": [".hip", ".hiplc", ".hipnc"],
+    "maya": [".ma", ".mb"],
+    "nuke": [".nk"],
+    "nukestudio": [".hrox"],
+    "photoshop": [".psd"],
+    "premiere": [".prproj"],
+    "resolve": [".drp"]
+}
 
 
 class IncompatibleLoaderError(ValueError):
@@ -174,7 +188,13 @@ class Loader(list):
 
     def __init__(self, context):
         representation = context['representation']
-        self.fname = get_representation_path(representation)
+        project_doc = context.get("project")
+        root = None
+        if project_doc and project_doc["name"] != Session["AVALON_PROJECT"]:
+            anatomy = Anatomy(project_doc["name"])
+            root = anatomy.roots_obj
+
+        self.fname = get_representation_path(representation, root)
 
     def load(self, context, name=None, namespace=None, options=None):
         """Load asset via database
@@ -358,6 +378,28 @@ class Application(Action):
         anatomy_filled = anatomy.format(template_data)
         session["AVALON_WORKDIR"] = anatomy_filled["work"]["folder"]
 
+        last_workfile_path = None
+        extensions = HOST_WORKFILE_EXTENSIONS.get(session["AVALON_APP"])
+        if extensions:
+            # Find last workfile
+            file_template = anatomy.templates["work"]["file"]
+            template_data.update({
+                "version": 1,
+                "user": getpass.getuser(),
+                "ext": extensions[0]
+            })
+
+            last_workfile_path = last_workfile(
+                session["AVALON_WORKDIR"],
+                file_template,
+                template_data,
+                extensions,
+                True
+            )
+
+        if last_workfile_path and os.path.exists(last_workfile_path):
+            session["AVALON_LAST_WORKFILE"] = last_workfile_path
+
         # dynamic environmnets
         tools_attr = []
         if session["AVALON_APP"] is not None:
@@ -375,8 +417,7 @@ class Application(Action):
 
         tools_env = acre.get_tools(tools_attr)
         dyn_env = acre.compute(tools_env)
-        dyn_env = acre.merge(dyn_env, current_env=dict(os.environ))
-        env = acre.append(dict(os.environ), dyn_env)
+        env = acre.merge(dyn_env, current_env=dict(os.environ))
 
         # Build environment
         env.update(self.config.get("environment", {}))
@@ -445,8 +486,17 @@ class Application(Action):
                 self.log.error(" - %s -> %s" % (src, dst))
 
     def launch(self, environment):
+        executable_path = self.config["executable"]
+        pype_config_path = os.environ.get("PYPE_CONFIG")
+        if pype_config_path:
+            # Get platform folder name
+            os_plat = platform.system().lower()
+            # Path to folder with launchers
+            path = os.path.join(pype_config_path, "launchers", os_plat)
+            if os.path.exists(path):
+                executable_path = os.path.join(path, executable_path)
+        executable = lib.which(executable_path)
 
-        executable = lib.which(self.config["executable"])
         if executable is None:
             raise ValueError(
                 "'%s' not found on your PATH\n%s"
@@ -1175,11 +1225,14 @@ def update_current_task(task=None, asset=None, app=None):
         Session, task=task, asset=asset, app=app
     )
 
-    # Update the full session in one go to avoid half updates
-    Session.update(changes)
-
-    # Update the environment
-    os.environ.update(changes)
+    # Update the Session and environments. Pop from environments all keys with
+    # value set to None.
+    for key, value in changes.items():
+        Session[key] = value
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = value
 
     # Emit session change
     emit("taskChanged", changes.copy())
@@ -1344,6 +1397,7 @@ def switch(container, representation):
 
     # Get the Loader for this container
     Loader = _get_container_loader(container)
+
     if not Loader:
         raise RuntimeError("Can't switch container. See log for details.")
 
@@ -1594,3 +1648,102 @@ def loaders_from_representation(loaders, representation):
 
     context = get_representation_context(representation)
     return [l for l in loaders if is_compatible_loader(l, context)]
+
+
+def last_workfile_with_version(workdir, file_template, fill_data, extensions):
+    """Return last workfile version.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+
+    Returns:
+        tuple: Last workfile<str> with version<int> if there is any otherwise
+            returns (None, None).
+    """
+    if not os.path.exists(workdir):
+        return None, None
+
+    # Fast match on extension
+    filenames = [
+        filename
+        for filename in os.listdir(workdir)
+        if os.path.splitext(filename)[1] in extensions
+    ]
+
+    # Build template without optionals, version to digits only regex
+    # and comment to any definable value.
+    file_template = re.sub("<.*?>", ".*?", file_template)
+    file_template = re.sub("{version.*}", "([0-9]+)", file_template)
+    file_template = re.sub("{comment.*?}", ".+?", file_template)
+    partially_filled = format_template_with_optional_keys(
+        fill_data,
+        file_template
+    )
+
+    _ext = []
+    for ext in extensions:
+        if not ext.startswith("."):
+            ext = "." + ext
+        # Escape dot for regex
+        ext = "\\" + ext
+        _ext.append(ext)
+
+    # Add or regex expression for extensions
+    partially_filled += "(?:" + "|".join(_ext) + ")"
+    file_template = "^" + partially_filled + "$"
+
+    # Match with ignore case on Windows due to the Windows
+    # OS not being case-sensitive. This avoids later running
+    # into the error that the file did exist if it existed
+    # with a different upper/lower-case.
+    kwargs = {}
+    if platform.system().lower() == "windows":
+        kwargs["flags"] = re.IGNORECASE
+
+    # Get highest version among existing matching files
+    output_filename = None
+    version = None
+    for filename in sorted(filenames):
+        match = re.match(file_template, filename, **kwargs)
+        if match:
+            file_version = int(match.group(1))
+            if version is None or file_version >= version:
+                version = file_version
+                output_filename = filename
+    return output_filename, version
+
+
+def last_workfile(
+    workdir, file_template, fill_data, extensions, full_path=False
+):
+    """Return last workfile filename.
+
+    Returns file with version 1 if there is not workfile yet.
+
+    Args:
+        workdir(str): Path to dir where workfiles are stored.
+        file_template(str): Template of file name.
+        fill_data(dict): Data for filling template.
+        extensions(list, tuple): All allowed file extensions of workfile.
+        full_path(bool): Full path to file is returned if set to True.
+
+    Returns:
+        str: Last or first workfile as filename of full path to filename.
+    """
+    filename, version = last_workfile_with_version(
+        workdir, file_template, fill_data, extensions
+    )
+    if filename is None:
+        data = copy.deepcopy(fill_data)
+        data["version"] = 1
+        data.pop("comment", None)
+        if not data.get("ext"):
+            data["ext"] = extensions[0]
+        filename = format_template_with_optional_keys(data, file_template)
+
+    if full_path:
+        return os.path.join(workdir, filename)
+    return filename

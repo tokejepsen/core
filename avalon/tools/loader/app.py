@@ -190,19 +190,32 @@ class Window(QtWidgets.QDialog):
 
         assets_widget = self.data["model"]["assets"]
         subsets_widget = self.data["model"]["subsets"]
+        subsets_model = subsets_widget.model
 
-        subsets_widget.model.clear()
+        subsets_model.clear()
         self.clear_assets_underlines()
 
         # filter None docs they are silo
         asset_docs = assets_widget.get_selected_assets()
-        if len(asset_docs) == 0:
-            return
 
         asset_ids = [asset_doc["_id"] for asset_doc in asset_docs]
-        subsets_widget.model.set_assets(asset_ids)
+        # Start loading
+        subsets_widget.set_loading_state(
+            loading=bool(asset_ids),
+            empty=True
+        )
+
+        def on_refreshed(has_item):
+            empty = not has_item
+            subsets_widget.set_loading_state(loading=False, empty=empty)
+            subsets_model.refreshed.disconnect()
+            self.echo("Duration: %.3fs" % (time.time() - t1))
+
+        subsets_model.refreshed.connect(on_refreshed)
+
+        subsets_model.set_assets(asset_ids)
         subsets_widget.view.setColumnHidden(
-            subsets_widget.model.Columns.index("asset"),
+            subsets_model.Columns.index("asset"),
             len(asset_ids) < 2
         )
 
@@ -211,8 +224,6 @@ class Window(QtWidgets.QDialog):
         self.data["widgets"]["thumbnail"].set_thumbnail(asset_docs)
 
         self.data["state"]["assetIds"] = asset_ids
-
-        self.echo("Duration: %.3fs" % (time.time() - t1))
 
     def _subsetschanged(self):
         asset_ids = self.data["state"]["assetIds"]
@@ -347,14 +358,6 @@ class Window(QtWidgets.QDialog):
         lib.schedule(widget.hide, 5000, channel="message")
 
     def closeEvent(self, event):
-        # Kill on holding SHIFT
-        modifiers = QtWidgets.QApplication.queryKeyboardModifiers()
-        shift_pressed = QtCore.Qt.ShiftModifier & modifiers
-
-        if shift_pressed:
-            print("Force quitted..")
-            self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-
         # Kill on holding SHIFT
         modifiers = QtWidgets.QApplication.queryKeyboardModifiers()
         shift_pressed = QtCore.Qt.ShiftModifier & modifiers
@@ -509,10 +512,7 @@ def show(debug=False, parent=None, use_context=False):
             module.window.activateWindow()     # for Windows
             module.window.refresh()
             return
-        except RuntimeError as e:
-            if not e.message.rstrip().endswith("already deleted."):
-                raise
-
+        except (AttributeError, RuntimeError):
             # Garbage collected
             module.window = None
 
@@ -562,6 +562,8 @@ def cli(args):
 
     args = parser.parse_args(args)
     project = args.project
+
+    print("Entering Project: %s" % project)
 
     io.install()
 

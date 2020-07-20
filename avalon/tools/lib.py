@@ -71,7 +71,7 @@ def schedule(func, time, channel="default"):
 
     try:
         self._jobs[channel].stop()
-    except (AttributeError, KeyError):
+    except (AttributeError, KeyError, RuntimeError):
         pass
 
     timer = QtCore.QTimer()
@@ -116,12 +116,13 @@ def iter_model_rows(model,
 
 
 @contextlib.contextmanager
-def preserve_states(
-    tree_view, column=0, role=None,
-    preserve_expanded=True, preserve_selection=True,
-    expanded_role=QtCore.Qt.DisplayRole, selection_role=QtCore.Qt.DisplayRole
-
-):
+def preserve_states(tree_view,
+                    column=0,
+                    role=None,
+                    preserve_expanded=True,
+                    preserve_selection=True,
+                    expanded_role=QtCore.Qt.DisplayRole,
+                    selection_role=QtCore.Qt.DisplayRole):
     """Preserves row selection in QTreeView by column's data role.
     This function is created to maintain the selection status of
     the model items. When refresh is triggered the items which are expanded
@@ -459,3 +460,26 @@ def get_active_group_config(asset_id, include_predefined=False):
         })
 
     return ordered
+
+
+def project_use_silo(project_doc):
+    """Check if templates of project document contain `{silo}`.
+
+    Args:
+        project_doc (dict): Project document queried from database.
+
+    Returns:
+        bool: True if any project's template contain "{silo}".
+    """
+    templates = project_doc["config"].get("template") or {}
+    for template in templates.values():
+        if "{silo}" in template:
+            return True
+    return False
+
+
+def create_qthread(func, *args, **kwargs):
+    class Thread(QtCore.QThread):
+        def run(self):
+            func(*args, **kwargs)
+    return Thread()

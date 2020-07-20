@@ -11,6 +11,7 @@ import logging
 import contextlib
 import json
 import signal
+import time
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
@@ -84,12 +85,18 @@ def launch_zip_file(filepath):
     scene_path = os.path.join(
         temp_path, os.path.basename(temp_path) + ".xstage"
     )
+    unzip = False
     if os.path.exists(scene_path):
         # Check remote scene is newer than local.
         if os.path.getmtime(scene_path) < os.path.getmtime(filepath):
             shutil.rmtree(temp_path)
-            with zipfile.ZipFile(filepath, "r") as zip_ref:
-                zip_ref.extractall(temp_path)
+            unzip = True
+    else:
+        unzip = True
+
+    if unzip:
+        with zipfile.ZipFile(filepath, "r") as zip_ref:
+            zip_ref.extractall(temp_path)
 
     # Close existing scene.
     if self.pid:
@@ -113,7 +120,7 @@ def launch_zip_file(filepath):
     self.pid = process.pid
 
 
-def on_file_changed(path):
+def on_file_changed(path, threaded=True):
     """Threaded zipping and move of the project directory.
 
     This method is called when the `.xstage` file is changed.
@@ -124,10 +131,14 @@ def on_file_changed(path):
     if self.workfile_path is None:
         return
 
-    thread = threading.Thread(
-        target=zip_and_move, args=(os.path.dirname(path), self.workfile_path)
-    )
-    thread.start()
+    if threaded:
+        thread = threading.Thread(
+            target=zip_and_move,
+            args=(os.path.dirname(path), self.workfile_path)
+        )
+        thread.start()
+    else:
+        zip_and_move(os.path.dirname(path), self.workfile_path)
 
 
 def zip_and_move(source, destination):
@@ -152,6 +163,11 @@ def show(module_name):
     Args:
         module_name (str): Name of module to call "show" on.
     """
+
+    # Requests often get doubled up when showing tools, so we wait a second for
+    # requests to be received properly.
+    time.sleep(1)
+
     # Need to have an existing QApplication.
     app = QtWidgets.QApplication.instance()
     if not app:
@@ -159,7 +175,11 @@ def show(module_name):
 
     # Import and show tool.
     module = importlib.import_module(module_name)
-    module.show()
+
+    if "loader" in module_name:
+        module.show(use_context=True)
+    else:
+        module.show()
 
     # QApplication needs to always execute.
     if "publish" in module_name:
@@ -168,36 +188,74 @@ def show(module_name):
     app.exec_()
 
 
-def read(node):
-    """Read the node metadata in to a dictionary.
+def get_scene_data():
+    func = """function func(args)
+    {
+        var metadata = scene.metadata("avalon");
+        if (metadata){
+            return JSON.parse(metadata.value);
+        }else {
+            return {};
+        }
+    }
+    func
+    """
+    try:
+        return self.send({"function": func})["result"]
+    except json.decoder.JSONDecodeError:
+        # Means no sceen metadata has been made before.
+        return {}
+    except KeyError:
+        # Means no existing scene metadata has been made.
+        return {}
+
+
+def set_scene_data(data):
+    # Write scene data.
+    func = """function func(args)
+    {
+        scene.setMetadata({
+          "name"       : "avalon",
+          "type"       : "string",
+          "creator"    : "Avalon",
+          "version"    : "1.0",
+          "value"      : JSON.stringify(args[0])
+        });
+    }
+    func
+    """
+    self.send({"function": func, "args": [data]})
+
+
+def read(node_id):
+    """Read object metadata in to a dictionary.
 
     Args:
-        node (str): Path to node.
+        node_id (str): Path to node or id of object.
 
     Returns:
         dict
     """
+    scene_data = get_scene_data()
+    if node_id in get_scene_data():
+        return scene_data[node_id]
 
-    func = """function read(node_path)
-    {
-        return node.getTextAttr(node_path, 1.0, "avalon");
-    }
-    read
-    """
-    try:
-        return json.loads(
-            self.send({"function": func, "args": [node]})["result"]
-        )
-    except json.decoder.JSONDecodeError:
-        return {}
+    return {}
 
 
-def imprint(node, data):
+def remove(node_id):
+    data = get_scene_data()
+    del data[node_id]
+    set_scene_data(data)
+
+
+def imprint(node_id, data, remove=False):
     """Write `data` to the `node` as json.
 
     Arguments:
-        node (str): Path to node.
+        node_id (str): Path to node or id of object.
         data (dict): Dictionary of key/value pairs.
+        remove (bool): Removes the data from the scene.
 
     Example:
         >>> from avalon.harmony import lib
@@ -205,27 +263,14 @@ def imprint(node, data):
         >>> data = {"str": "someting", "int": 1, "float": 0.32, "bool": True}
         >>> lib.imprint(layer, data)
     """
+    scene_data = get_scene_data()
 
-    node_data = read(node)
-    node_data.update(data)
+    if node_id in scene_data:
+        scene_data[node_id].update(data)
+    else:
+        scene_data[node_id] = data
 
-    func = """function imprint(args)
-    {
-        var node_path = args[0];
-        var data = args[1];
-        node.createDynamicAttr(
-            node_path, "STRING", "avalon", "Avalon Metadata", false
-        );
-        node.setTextAttr(
-            node_path,
-            "avalon",
-            1.0,
-            JSON.stringify(data)
-        );
-    }
-    imprint
-    """
-    self.send({"function": func, "args": [node, node_data]})
+    set_scene_data(scene_data)
 
 
 @contextlib.contextmanager
@@ -337,7 +382,7 @@ def save_scene():
     scene_path = self.send({"function": func})["result"]
 
     # Manually update the remote file.
-    self.on_file_changed(scene_path)
+    self.on_file_changed(scene_path, threaded=False)
 
     # Re-enable the background watcher.
     func = """function func()
@@ -348,3 +393,47 @@ def save_scene():
     func
     """
     self.send({"function": func})
+
+
+def save_scene_as(filepath):
+    """Save Harmony scene as `filepath`."""
+
+    scene_dir = os.path.dirname(filepath)
+    destination = os.path.join(
+        os.path.dirname(self.workfile_path),
+        os.path.splitext(os.path.basename(filepath))[0] + ".zip"
+    )
+
+    if os.path.exists(scene_dir):
+        shutil.rmtree(scene_dir)
+
+    send(
+        {"function": "scene.saveAs", "args": [scene_dir]}
+    )["result"]
+
+    zip_and_move(scene_dir, destination)
+
+    self.workfile_path = destination
+
+    func = """function add_path(path)
+    {
+        var app = QCoreApplication.instance();
+        app.watcher.addPath(path);
+    }
+    add_path
+    """
+    send(
+        {"function": func, "args": [filepath]}
+    )
+
+
+def find_node_by_name(name, node_type):
+    nodes = send(
+        {"function": "node.getNodes", "args": [[node_type]]}
+    )["result"]
+    for node in nodes:
+        node_name = node.split("/")[-1]
+        if name == node_name:
+            return node
+
+    return None
