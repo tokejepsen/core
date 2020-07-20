@@ -121,9 +121,9 @@ class View(QtWidgets.QTreeView):
             if has_outdated:
                 break
 
-        update_to_versioned = None
+        switch_to_versioned = None
         if has_loaded_master_versions:
-            def _on_update_to_versioned(items):
+            def _on_switch_to_versioned(items):
                 repre_ids = []
                 for item in items:
                     item_id = io.ObjectId(item["representation"])
@@ -181,13 +181,13 @@ class View(QtWidgets.QTreeView):
                 "fa.asterisk",
                 color=DEFAULT_COLOR
             )
-            update_to_versioned = QtWidgets.QAction(
+            switch_to_versioned = QtWidgets.QAction(
                 update_icon,
-                "Update to versioned",
+                "Switch to versioned",
                 menu
             )
-            update_to_versioned.triggered.connect(
-                lambda: _on_update_to_versioned(items)
+            switch_to_versioned.triggered.connect(
+                lambda: _on_switch_to_versioned(items)
             )
 
         update_to_latest_action = None
