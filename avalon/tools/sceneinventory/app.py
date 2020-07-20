@@ -136,11 +136,11 @@ class View(QtWidgets.QTreeView):
                 })
 
                 version_ids = []
-                master_version_id_by_repre_id = {}
+                version_id_by_repre_id = {}
                 for repre in repre_entities:
                     version_id = repre["parent"]
-                    master_version_id_by_repre_id[repre["_id"]] = version_id
-                    if version_id not in parent_ids:
+                    version_id_by_repre_id[repre["_id"]] = version_id
+                    if version_id not in version_ids:
                         version_ids.append(version_id)
 
                 master_versions = list(io.find({
@@ -149,15 +149,14 @@ class View(QtWidgets.QTreeView):
                 }))
 
                 version_ids = set()
-                version_id_by_repre_id = {}
                 for master_version in master_versions:
                     version_id = master_version["version_id"]
-                    version_ids.set(version_id)
+                    version_ids.add(version_id)
                     master_version_id = master_version["_id"]
-                    for _repre_id, _master_version_id in (
-                        master_version_id_by_repre_id.items()
+                    for _repre_id, _version_id in (
+                        version_id_by_repre_id.items()
                     ):
-                        if _master_version_id == master_version_id:
+                        if _version_id == master_version_id:
                             version_id_by_repre_id[_repre_id] = version_id
 
                 version_docs = io.find({
@@ -172,9 +171,9 @@ class View(QtWidgets.QTreeView):
                     repre_id = io.ObjectId(item["representation"])
                     version_id = version_id_by_repre_id.get(repre_id)
                     version_name = version_name_by_id.get(version_id)
-                    if version_name is None:
-                        continue
-                    api.update(item, version_name)
+                    if version_name is not None:
+                        api.update(item, version_name)
+
                 self.data_changed.emit()
 
             update_icon = qtawesome.icon(
