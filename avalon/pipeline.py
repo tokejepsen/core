@@ -449,7 +449,8 @@ class Application(Action):
         """Build application environment"""
 
         session = session.copy()
-        session["AVALON_APP"] = self.config["application_dir"]
+        host_name = self.config["application_dir"]
+        session["AVALON_APP"] = host_name
         session["AVALON_APP_NAME"] = self.name
 
         # Compute work directory
@@ -478,7 +479,13 @@ class Application(Action):
                 True
             )
 
-        if last_workfile_path and os.path.exists(last_workfile_path):
+        start_last_workfile = should_start_last_workfile(
+            project["name"], host_name, session["AVALON_TASK"]
+        )
+        # Store boolean as "0"(False) or "1"(True)
+        session["AVALON_OPEN_LAST_WORKFILE"] = (
+            str(int(bool(start_last_workfile)))
+        )
             session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
