@@ -62,8 +62,8 @@ def reset_frame_range():
     if handle_end is None:
         handle_end = handles
 
-    frame_start -= handle_start
-    frame_end += handle_end
+    frame_start -= int(handle_start)
+    frame_end += int(handle_end)
 
     cmds.playbackOptions(minTime=frame_start)
     cmds.playbackOptions(maxTime=frame_end)
