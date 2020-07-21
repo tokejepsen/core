@@ -92,24 +92,34 @@ def _resolution_from_document(doc):
         return None
 
     return int(resolution_width), int(resolution_height)
-def reset_resolution():
-    project = io.find_one({"type": "project"})
 
-    try:
-        resolution_width = project["data"].get(
-            "resolutionWidth",
-            # backwards compatibility
-            project["data"].get("resolution_width", 1920)
-        )
-        resolution_height = project["data"].get(
-            "resolutionHeight",
-            # backwards compatibility
-            project["data"].get("resolution_height", 1080)
-        )
-    except KeyError:
-        cmds.warning("No resolution information found for %s"
-                     % project["name"])
-        return
+
+def reset_resolution():
+    # Default values
+    resolution_width = 1920
+    resolution_height = 1080
+
+    # Get resolution from asset
+    asset_name = api.Session["AVALON_ASSET"]
+    asset_doc = io.find_one({"name": asset_name, "type": "asset"})
+    resolution = _resolution_from_document(asset_doc)
+    # Try get resolution from project
+    if resolution is None:
+        # TODO go through visualParents
+        print((
+            "Asset \"{}\" does not have set resolution."
+            " Trying to get resolution from project"
+        ).format(asset_name))
+        project_doc = io.find_one({"type": "project"})
+        resolution = _resolution_from_document(project_doc)
+
+    if resolution is None:
+        msg = "Using default resolution {}x{}"
+    else:
+        resolution_width, resolution_height = resolution
+        msg = "Setting resolution to {}x{}"
+
+    print(msg.format(resolution_width, resolution_height))
 
     cmds.setAttr("defaultResolution.width", resolution_width)
     cmds.setAttr("defaultResolution.height", resolution_height)
