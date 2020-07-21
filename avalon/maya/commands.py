@@ -54,8 +54,13 @@ def reset_frame_range():
         return
 
     handles = asset["data"].get("handles") or 0
-    handle_start = int(asset["data"].get("handleStart", handles))
-    handle_end = int(asset["data"].get("handleEnd", handles))
+    handle_start = asset["data"].get("handleStart")
+    if handle_start is None:
+        handle_start = handles
+
+    handle_end = asset["data"].get("handleEnd")
+    if handle_end is None:
+        handle_end = handles
 
     frame_start -= handle_start
     frame_end += handle_end
