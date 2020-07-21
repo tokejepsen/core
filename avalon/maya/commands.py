@@ -53,7 +53,7 @@ def reset_frame_range():
         cmds.warning("No edit information found for %s" % asset_name)
         return
 
-    handles = int(asset["data"].get("handles", 0))
+    handles = asset["data"].get("handles") or 0
     handle_start = int(asset["data"].get("handleStart", handles))
     handle_end = int(asset["data"].get("handleEnd", handles))
 
