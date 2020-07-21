@@ -38,16 +38,12 @@ def reset_frame_range():
     asset_name = api.Session["AVALON_ASSET"]
     asset = io.find_one({"name": asset_name, "type": "asset"})
 
-    frame_start = asset["data"].get(
-        "frameStart",
-        # backwards compatibility
-        asset["data"].get("edit_in")
-    )
-    frame_end = asset["data"].get(
-        "frameEnd",
-        # backwards compatibility
-        asset["data"].get("edit_out")
-    )
+    frame_start = asset["data"].get("frameStart")
+    frame_end = asset["data"].get("frameEnd")
+    # Backwards compatibility
+    if frame_start is None or frame_end is None:
+        frame_start = asset["data"].get("edit_in")
+        frame_end = asset["data"].get("edit_out")
 
     if frame_start is None or frame_end is None:
         cmds.warning("No edit information found for %s" % asset_name)
