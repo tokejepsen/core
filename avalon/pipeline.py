@@ -486,6 +486,12 @@ class Application(Action):
         session["AVALON_OPEN_LAST_WORKFILE"] = (
             str(int(bool(start_last_workfile)))
         )
+
+        if (
+            start_last_workfile
+            and last_workfile_path
+            and os.path.exists(last_workfile_path)
+        ):
             session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
