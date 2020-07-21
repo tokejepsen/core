@@ -72,6 +72,26 @@ def reset_frame_range():
     cmds.setAttr("defaultRenderGlobals.endFrame", frame_end)
 
 
+def _resolution_from_document(doc):
+    if not doc or "data" not in doc:
+        print("Entered document is not valid. \"{}\"".format(str(doc)))
+        return None
+
+    resolution_width = doc["data"].get("resolutionWidth")
+    resolution_height = doc["data"].get("resolutionHeight")
+    # Backwards compatibility
+    if resolution_width is None or resolution_height is None:
+        resolution_width = doc["data"].get("resolution_width")
+        resolution_height = doc["data"].get("resolution_height")
+
+    # Make sure both width and heigh are set
+    if resolution_width is None or resolution_height is None:
+        cmds.warning(
+            "No resolution information found for \"{}\"".format(doc["name"])
+        )
+        return None
+
+    return int(resolution_width), int(resolution_height)
 def reset_resolution():
     project = io.find_one({"type": "project"})
 
