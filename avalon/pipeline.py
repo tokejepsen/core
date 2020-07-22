@@ -418,7 +418,7 @@ def should_start_last_workfile(project_name, host_name, task_name):
             break
 
     if matching_item is not None:
-        output = matching_item.get("startup")
+        output = matching_item.get("enabled")
         if output is None:
             output = default_output
         return default_output
