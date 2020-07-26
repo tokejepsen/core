@@ -38,27 +38,28 @@ def reset_frame_range():
     asset_name = api.Session["AVALON_ASSET"]
     asset = io.find_one({"name": asset_name, "type": "asset"})
 
-    frame_start = asset["data"].get(
-        "frameStart",
-        # backwards compatibility
-        asset["data"].get("edit_in")
-    )
-    frame_end = asset["data"].get(
-        "frameEnd",
-        # backwards compatibility
-        asset["data"].get("edit_out")
-    )
+    frame_start = asset["data"].get("frameStart")
+    frame_end = asset["data"].get("frameEnd")
+    # Backwards compatibility
+    if frame_start is None or frame_end is None:
+        frame_start = asset["data"].get("edit_in")
+        frame_end = asset["data"].get("edit_out")
 
     if frame_start is None or frame_end is None:
         cmds.warning("No edit information found for %s" % asset_name)
         return
 
-    handles = int(asset["data"].get("handles", 0))
-    handle_start = int(asset["data"].get("handleStart", handles))
-    handle_end = int(asset["data"].get("handleEnd", handles))
+    handles = asset["data"].get("handles") or 0
+    handle_start = asset["data"].get("handleStart")
+    if handle_start is None:
+        handle_start = handles
 
-    frame_start -= handle_start
-    frame_end += handle_end
+    handle_end = asset["data"].get("handleEnd")
+    if handle_end is None:
+        handle_end = handles
+
+    frame_start -= int(handle_start)
+    frame_end += int(handle_end)
 
     cmds.playbackOptions(minTime=frame_start)
     cmds.playbackOptions(maxTime=frame_end)
