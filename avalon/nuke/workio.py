@@ -5,7 +5,7 @@ from avalon import api
 
 
 def file_extensions():
-    return [".nk"]
+    return api.HOST_WORKFILE_EXTENSIONS["nuke"]
 
 
 def has_unsaved_changes():

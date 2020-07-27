@@ -11,6 +11,7 @@ import logging
 import contextlib
 import json
 import signal
+import time
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
@@ -162,6 +163,11 @@ def show(module_name):
     Args:
         module_name (str): Name of module to call "show" on.
     """
+
+    # Requests often get doubled up when showing tools, so we wait a second for
+    # requests to be received properly.
+    time.sleep(1)
+
     # Need to have an existing QApplication.
     app = QtWidgets.QApplication.instance()
     if not app:
@@ -182,36 +188,74 @@ def show(module_name):
     app.exec_()
 
 
-def read(node):
-    """Read the node metadata in to a dictionary.
+def get_scene_data():
+    func = """function func(args)
+    {
+        var metadata = scene.metadata("avalon");
+        if (metadata){
+            return JSON.parse(metadata.value);
+        }else {
+            return {};
+        }
+    }
+    func
+    """
+    try:
+        return self.send({"function": func})["result"]
+    except json.decoder.JSONDecodeError:
+        # Means no sceen metadata has been made before.
+        return {}
+    except KeyError:
+        # Means no existing scene metadata has been made.
+        return {}
+
+
+def set_scene_data(data):
+    # Write scene data.
+    func = """function func(args)
+    {
+        scene.setMetadata({
+          "name"       : "avalon",
+          "type"       : "string",
+          "creator"    : "Avalon",
+          "version"    : "1.0",
+          "value"      : JSON.stringify(args[0])
+        });
+    }
+    func
+    """
+    self.send({"function": func, "args": [data]})
+
+
+def read(node_id):
+    """Read object metadata in to a dictionary.
 
     Args:
-        node (str): Path to node.
+        node_id (str): Path to node or id of object.
 
     Returns:
         dict
     """
+    scene_data = get_scene_data()
+    if node_id in get_scene_data():
+        return scene_data[node_id]
 
-    func = """function read(node_path)
-    {
-        return node.getTextAttr(node_path, 1.0, "avalon");
-    }
-    read
-    """
-    try:
-        return json.loads(
-            self.send({"function": func, "args": [node]})["result"]
-        )
-    except json.decoder.JSONDecodeError:
-        return {}
+    return {}
 
 
-def imprint(node, data):
+def remove(node_id):
+    data = get_scene_data()
+    del data[node_id]
+    set_scene_data(data)
+
+
+def imprint(node_id, data, remove=False):
     """Write `data` to the `node` as json.
 
     Arguments:
-        node (str): Path to node.
+        node_id (str): Path to node or id of object.
         data (dict): Dictionary of key/value pairs.
+        remove (bool): Removes the data from the scene.
 
     Example:
         >>> from avalon.harmony import lib
@@ -219,27 +263,14 @@ def imprint(node, data):
         >>> data = {"str": "someting", "int": 1, "float": 0.32, "bool": True}
         >>> lib.imprint(layer, data)
     """
+    scene_data = get_scene_data()
 
-    node_data = read(node)
-    node_data.update(data)
+    if node_id in scene_data:
+        scene_data[node_id].update(data)
+    else:
+        scene_data[node_id] = data
 
-    func = """function imprint(args)
-    {
-        var node_path = args[0];
-        var data = args[1];
-        node.createDynamicAttr(
-            node_path, "STRING", "avalon", "Avalon Metadata", false
-        );
-        node.setTextAttr(
-            node_path,
-            "avalon",
-            1.0,
-            JSON.stringify(data)
-        );
-    }
-    imprint
-    """
-    self.send({"function": func, "args": [node, node_data]})
+    set_scene_data(scene_data)
 
 
 @contextlib.contextmanager
@@ -394,3 +425,15 @@ def save_scene_as(filepath):
     send(
         {"function": func, "args": [filepath]}
     )
+
+
+def find_node_by_name(name, node_type):
+    nodes = send(
+        {"function": "node.getNodes", "args": [[node_type]]}
+    )["result"]
+    for node in nodes:
+        node_name = node.split("/")[-1]
+        if name == node_name:
+            return node
+
+    return None

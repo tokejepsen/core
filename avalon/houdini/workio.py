@@ -2,10 +2,11 @@
 import os
 
 import hou
+from avalon import api
 
 
 def file_extensions():
-    return [".hip", ".hiplc", ".hipnc"]
+    return api.HOST_WORKFILE_EXTENSIONS["houdini"]
 
 
 def has_unsaved_changes():
