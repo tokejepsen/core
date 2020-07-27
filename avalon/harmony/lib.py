@@ -55,7 +55,24 @@ def launch(application_path):
     self.application_path = application_path
 
     # Launch Harmony.
-    os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
+    if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
+
+        avalon_harmony_startup_path = \
+            os.path.join(os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), "TB_sceneOpened.js")
+
+        env_harmony_startup_path = os.path.join(os.path.dirname(__file__), "TB_sceneOpened.js")
+
+        if not filecmp.cmp(avalon_harmony_startup_path, env_harmony_startup_path):
+            try:
+                shutil.copy(avalon_harmony_startup_path, env_harmony_startup_path)
+            except:
+                self.log.error(
+                    "Failed to copy {0} to {1}! Defaulting to Avalon TOONBOOM_GLOBAL_SCRIPT_LOCATION."
+                        .format(avalon_harmony_startup_path, env_harmony_startup_path))
+                os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
+
+    else:
+        os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
 
     if os.environ.get("AVALON_HARMONY_WORKFILES_ON_LAUNCH", False):
         workfiles.show(save=False)
