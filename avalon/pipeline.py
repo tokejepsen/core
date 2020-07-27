@@ -344,6 +344,111 @@ class InventoryAction(object):
         return True
 
 
+def compile_list_of_regexes(in_list):
+    """Convert strings in entered list to compiled regex objects."""
+    regexes = list()
+    if not in_list:
+        return regexes
+
+    for item in in_list:
+        if item:
+            try:
+                regexes.append(re.compile(item))
+            except TypeError:
+                log.warning((
+                    "Invalid type \"{}\" value \"{}\"."
+                    " Expected string based object. Skipping."
+                ).format(str(type(item)), str(item)))
+    return regexes
+
+
+def should_start_last_workfile(project_name, host_name, task_name):
+    """Define if host should start last version workfile if possible.
+
+    Default output is `False`. Can be overriden with environment variable
+    `AVALON_OPEN_LAST_WORKFILE`, valid values without case sensitivity are
+    `"0", "1", "true", "false", "yes", "no"`.
+
+    Args:
+        project_name (str): Name of project.
+        host_name (str): Name of host which is launched. In avalon's
+            application context it's value stored in app definition under
+            key `"application_dir"`. Is not case sensitive.
+        task_name (str): Name of task which is used for launching the host.
+            Task name is not case sensitive.
+
+    Returns:
+        bool: True if host should start workfile.
+
+    """
+    default_output = False
+
+    env_override = os.environ.get("AVALON_OPEN_LAST_WORKFILE")
+    if env_override is not None:
+        env_override = env_override.lower().strip()
+        if env_override in ("true", "yes", "1"):
+            default_output = True
+        elif env_override in ("false", "no", "0"):
+            default_output = False
+
+    try:
+        from pype.api import config
+        startup_presets = (
+            config.get_presets(project_name)
+            .get("tools", {})
+            .get("workfiles", {})
+            .get("last_workfile_on_startup")
+        )
+    except Exception:
+        startup_presets = None
+        log.warning("Couldn't load pype's presets", exc_info=True)
+
+    if not startup_presets:
+        return default_output
+
+    host_name_lowered = host_name.lower()
+    task_name_lowered = task_name.lower()
+
+    max_points = 2
+    matching_points = -1
+    matching_item = None
+    for item in startup_presets:
+        hosts = item.get("hosts") or tuple()
+        tasks = item.get("tasks") or tuple()
+
+        hosts_lowered = (_host_name.lower() for _host_name in hosts)
+        # Skip item if has set hosts and current host is not in
+        if hosts_lowered and host_name_lowered not in hosts_lowered:
+            continue
+
+        tasks_lowered = (_task_name.lower() for _task_name in tasks)
+        # Skip item if has set tasks and current task is not in
+        if tasks_lowered:
+            task_match = False
+            for task_regex in compile_list_of_regexes(tasks_lowered):
+                if re.match(task_regex, task_name_lowered):
+                    task_match = True
+                    break
+
+            if not task_match:
+                continue
+
+        points = int(bool(hosts_lowered)) + int(bool(tasks_lowered))
+        if points > matching_points:
+            matching_item = item
+            matching_points = points
+
+        if matching_points == max_points:
+            break
+
+    if matching_item is not None:
+        output = matching_item.get("enabled")
+        if output is None:
+            output = default_output
+        return output
+    return default_output
+
+
 class Application(Action):
     """Default application launcher
 
@@ -368,7 +473,8 @@ class Application(Action):
         """Build application environment"""
 
         session = session.copy()
-        session["AVALON_APP"] = self.config["application_dir"]
+        host_name = self.config["application_dir"]
+        session["AVALON_APP"] = host_name
         session["AVALON_APP_NAME"] = self.name
 
         # Compute work directory
@@ -397,7 +503,19 @@ class Application(Action):
                 True
             )
 
-        if last_workfile_path and os.path.exists(last_workfile_path):
+        start_last_workfile = should_start_last_workfile(
+            project["name"], host_name, session["AVALON_TASK"]
+        )
+        # Store boolean as "0"(False) or "1"(True)
+        session["AVALON_OPEN_LAST_WORKFILE"] = (
+            str(int(bool(start_last_workfile)))
+        )
+
+        if (
+            start_last_workfile
+            and last_workfile_path
+            and os.path.exists(last_workfile_path)
+        ):
             session["AVALON_LAST_WORKFILE"] = last_workfile_path
 
         # dynamic environmnets
