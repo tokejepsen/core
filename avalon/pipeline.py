@@ -344,6 +344,24 @@ class InventoryAction(object):
         return True
 
 
+def compile_list_of_regexes(in_list):
+    """Convert strings in entered list to compiled regex objects."""
+    regexes = list()
+    if not in_list:
+        return regexes
+
+    for item in in_list:
+        if item:
+            try:
+                regexes.append(re.compile(item))
+            except TypeError:
+                log.warning((
+                    "Invalid type \"{}\" value \"{}\"."
+                    " Expected string based object. Skipping."
+                ).format(str(type(item)), str(item)))
+    return regexes
+
+
 def should_start_last_workfile(project_name, host_name, task_name):
     """Define if host should start last version workfile if possible.
 
@@ -399,15 +417,21 @@ def should_start_last_workfile(project_name, host_name, task_name):
         tasks = item.get("tasks") or tuple()
 
         hosts_lowered = (_host_name.lower() for _host_name in hosts)
-        tasks_lowered = (_task_name.lower() for _task_name in tasks)
-
-        if (
-            # Skip item if has set hosts and current host is not in
-            (hosts_lowered and host_name_lowered not in hosts_lowered)
-            # Skip item if has set tasks and current task is not in
-            or (tasks_lowered and task_name_lowered not in tasks_lowered)
-        ):
+        # Skip item if has set hosts and current host is not in
+        if hosts_lowered and host_name_lowered not in hosts_lowered:
             continue
+
+        tasks_lowered = (_task_name.lower() for _task_name in tasks)
+        # Skip item if has set tasks and current task is not in
+        if tasks_lowered:
+            task_match = False
+            for task_regex in compile_list_of_regexes(tasks_lowered):
+                if re.match(task_regex, task_name_lowered):
+                    task_match = True
+                    break
+
+            if not task_match:
+                continue
 
         points = int(bool(hosts_lowered)) + int(bool(tasks_lowered))
         if points > matching_points:
