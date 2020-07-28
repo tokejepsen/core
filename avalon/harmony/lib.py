@@ -59,10 +59,12 @@ def launch(application_path):
     if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
 
         avalon_harmony_startup_path = os.path.join(
-            os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), "TB_sceneOpened.js")
+            os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), "TB_sceneOpened.js"
+        )
 
         env_harmony_startup_path = os.path.join(
-            os.path.dirname(__file__), "TB_sceneOpened.js")
+            os.path.dirname(__file__), "TB_sceneOpened.js"
+        )
 
         if not filecmp.cmp(avalon_harmony_startup_path,
                            env_harmony_startup_path):
