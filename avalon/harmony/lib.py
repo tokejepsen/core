@@ -60,7 +60,7 @@ def launch(application_path):
 
         avalon_harmony_startup_path = \
             os.path.join(os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"),
-                                   "TB_sceneOpened.js")
+                         "TB_sceneOpened.js")
 
         env_harmony_startup_path = \
             os.path.join(os.path.dirname(__file__), "TB_sceneOpened.js")
