@@ -5,6 +5,8 @@ import os
 import sys
 import queue
 import importlib
+import time
+import traceback
 
 from ..tools import html_server
 from ..vendor.Qt import QtWidgets
@@ -84,16 +86,33 @@ def app():
     return Dispatch("Photoshop.Application")
 
 
+def safe_excepthook(*args):
+    traceback.print_exception(*args)
+
+
 def launch(application):
     """Starts the web server that will be hosted in the Photoshop extension.
     """
     from avalon import api, photoshop
 
     api.install(photoshop)
+    sys.excepthook = safe_excepthook
 
     # Launch Photoshop and the html server.
     process = subprocess.Popen(application, stdout=subprocess.PIPE)
     server = html_server.app.start_server(5000)
+
+    while True:
+        if process.poll() is not None:
+            print("Photoshop process is not alive. Exiting")
+            server.shutdown()
+            sys.exit(1)
+        try:
+            _app = photoshop.app()
+            if _app:
+                break
+        except Exception:
+            time.sleep(0.1)
 
     # Wait for application launch to show Workfiles.
     if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", False):
