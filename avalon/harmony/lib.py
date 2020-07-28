@@ -57,15 +57,17 @@ def launch(application_path):
 
     # Launch Harmony.
     if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
-
+        
+        current_dir = os.path.dirname(__file__)
+        
         avalon_harmony_startup_path = os.path.join(
             os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), "TB_sceneOpened.js"
         )
 
         env_harmony_startup_path = os.path.join(
-            os.path.dirname(__file__), "TB_sceneOpened.js"
+           current_dir, "TB_sceneOpened.js"
         )
-
+        
         if not filecmp.cmp(avalon_harmony_startup_path,
                            env_harmony_startup_path):
             try:
@@ -79,11 +81,9 @@ def launch(application_path):
                         .format(avalon_harmony_startup_path,
                                 env_harmony_startup_path))
 
-                os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = \
-                    os.path.dirname(__file__)
+                os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = current_dir
     else:
-        os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = \
-            os.path.dirname(__file__)
+        os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = current_dir
 
     if os.environ.get("AVALON_HARMONY_WORKFILES_ON_LAUNCH", False):
         workfiles.show(save=False)
