@@ -57,23 +57,24 @@ def launch(application_path):
 
     # Launch Harmony.
     current_dir = os.path.dirname(__file__)
+    startup_js = "TB_sceneOpened.js"
     if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
-        avalon_harmony_script_path = os.path.join(
-            os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), "TB_sceneOpened.js")
-
-        env_harmony_script_path = os.path.join(current_dir, "TB_sceneOpened.js")
-
-        if not filecmp.cmp(avalon_harmony_script_path, env_harmony_script_path):
+        avalon_harmony_startup = os.path.join(
+            os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), startup_js)
+        
+        env_harmony_startup = os.path.join(current_dir, startup_js)
+        
+        if not filecmp.cmp(avalon_harmony_startup, env_harmony_startup):
             try:
-                shutil.copy(avalon_harmony_script_path,
-                            env_harmony_script_path)
+                shutil.copy(avalon_harmony_startup,
+                            env_harmony_startup)
             except Exception as e:
                 self.log.error(e)
                 self.log.warning(
                     "Failed to copy {0} to {1}! "
                     "Defaulting to Avalon TOONBOOM_GLOBAL_SCRIPT_LOCATION."
-                        .format(avalon_harmony_script_path,
-                                env_harmony_script_path))
+                        .format(avalon_harmony_startup,
+                                env_harmony_startup))
                 os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = current_dir
     else:
         os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = current_dir
