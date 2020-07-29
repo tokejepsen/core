@@ -255,17 +255,19 @@ def requires_install(f):
 
 def auto_reconnect(f):
     """Handling auto reconnect in 3 retry times"""
+    retry_times = 3
+
     @functools.wraps(f)
     def decorated(*args, **kwargs):
-        for retry in range(3):
+        for retry in range(1, retry_times + 1):
             try:
                 return f(*args, **kwargs)
             except pymongo.errors.AutoReconnect:
                 log.error("Reconnecting..")
-                time.sleep(0.1)
-        else:
-            raise
-
+                if retry < retry_times:
+                    time.sleep(0.1)
+                else:
+                    raise
     return decorated
 
 
