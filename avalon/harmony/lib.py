@@ -39,7 +39,7 @@ def main_thread_listen():
     callback = self.callback_queue.get()
     callback()
 
-    
+
 def setup_startup_scripts():
     """Manages installation of avalon's TB_sceneOpened.js for Harmony launch.
 
@@ -56,10 +56,14 @@ def setup_startup_scripts():
     """
     avalon_dcc_dir = os.path.dirname(__file__)
     startup_js = "TB_sceneOpened.js"
+
     if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
+
         avalon_harmony_startup = os.path.join(avalon_dcc_dir, startup_js)
+
         env_harmony_startup = os.path.join(
             os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), startup_js)
+
         if not filecmp.cmp(avalon_harmony_startup, env_harmony_startup):
             try:
                 shutil.copy(avalon_harmony_startup, env_harmony_startup)
@@ -69,6 +73,7 @@ def setup_startup_scripts():
                     "Failed to copy {0} to {1}! "
                     "Defaulting to Avalon TOONBOOM_GLOBAL_SCRIPT_LOCATION."
                         .format(avalon_harmony_startup, env_harmony_startup))
+
                 os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = avalon_dcc_dir
     else:
         os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = avalon_dcc_dir
