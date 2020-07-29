@@ -416,12 +416,12 @@ def should_start_last_workfile(project_name, host_name, task_name):
         hosts = item.get("hosts") or tuple()
         tasks = item.get("tasks") or tuple()
 
-        hosts_lowered = (_host_name.lower() for _host_name in hosts)
+        hosts_lowered = tuple(_host_name.lower() for _host_name in hosts)
         # Skip item if has set hosts and current host is not in
         if hosts_lowered and host_name_lowered not in hosts_lowered:
             continue
 
-        tasks_lowered = (_task_name.lower() for _task_name in tasks)
+        tasks_lowered = tuple(_task_name.lower() for _task_name in tasks)
         # Skip item if has set tasks and current task is not in
         if tasks_lowered:
             task_match = False
