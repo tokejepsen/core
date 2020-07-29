@@ -59,9 +59,9 @@ def launch(application_path):
     current_dir = os.path.dirname(__file__)
     startup_js = "TB_sceneOpened.js"
     if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
-        avalon_harmony_startup = os.path.join(
+        avalon_harmony_startup = os.path.join(current_dir, startup_js)
+        env_harmony_startup = os.path.join(
             os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), startup_js)
-        env_harmony_startup = os.path.join(current_dir, startup_js)
         if not filecmp.cmp(avalon_harmony_startup, env_harmony_startup):
             try:
                 shutil.copy(avalon_harmony_startup,
