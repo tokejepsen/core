@@ -39,6 +39,7 @@ def main_thread_listen():
     callback = self.callback_queue.get()
     callback()
 
+    
 def setup_startup_scripts():
     """Manages installation of avalon's TB_sceneOpened.js for Harmony launch.
 
