@@ -13,6 +13,7 @@ import logging
 from .server import Server
 from ..tools import workfiles
 from ..vendor.Qt import QtWidgets
+from ..harmony.lib import setup_startup_scripts
 
 self = sys.modules[__name__]
 self.server = None
@@ -62,7 +63,7 @@ def launch(application_path, zip_file):
     self.extension = extension_mapping[self.application_name]
 
     # Launch Harmony.
-    os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
+    setup_startup_scripts()
 
     if os.environ.get("AVALON_TOONBOOM_WORKFILES_ON_LAUNCH", False):
         workfiles.show(save=False)
