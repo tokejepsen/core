@@ -17,6 +17,7 @@ import filecmp
 from .server import Server
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
+from ..toonboom import setup_startup_scripts
 
 self = sys.modules[__name__]
 self.server = None
@@ -38,45 +39,6 @@ def execute_in_main_thread(func_to_call_from_main_thread):
 def main_thread_listen():
     callback = self.callback_queue.get()
     callback()
-
-
-def setup_startup_scripts():
-    """Manages installation of avalon's TB_sceneOpened.js for Harmony launch.
-
-    If a studio already has defined "TOONBOOM_GLOBAL_SCRIPT_LOCATION", copies
-    the TB_sceneOpened.js to that location if the file is different.
-    Otherwise, will set the env var to point to the avalon/harmony folder.
-
-    Admins should be aware that this will overwrite TB_sceneOpened in the
-    "TOONBOOM_GLOBAL_SCRIPT_LOCATION", and that if they want to have additional
-    logic, they will need to one of the following:
-        * Create a Harmony package to manage startup logic
-        * Use TB_sceneOpenedUI.js instead to manage startup logic
-        * Add their startup logic to avalon/harmony/TB_sceneOpened.js
-    """
-    avalon_dcc_dir = os.path.dirname(__file__)
-    startup_js = "TB_sceneOpened.js"
-
-    if os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"):
-
-        avalon_harmony_startup = os.path.join(avalon_dcc_dir, startup_js)
-
-        env_harmony_startup = os.path.join(
-            os.getenv("TOONBOOM_GLOBAL_SCRIPT_LOCATION"), startup_js)
-
-        if not filecmp.cmp(avalon_harmony_startup, env_harmony_startup):
-            try:
-                shutil.copy(avalon_harmony_startup, env_harmony_startup)
-            except Exception as e:
-                self.log.error(e)
-                self.log.warning(
-                    "Failed to copy {0} to {1}! "
-                    "Defaulting to Avalon TOONBOOM_GLOBAL_SCRIPT_LOCATION."
-                        .format(avalon_harmony_startup, env_harmony_startup))
-
-                os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = avalon_dcc_dir
-    else:
-        os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = avalon_dcc_dir
 
 def launch(application_path):
     """Setup for Harmony launch.
@@ -148,7 +110,7 @@ def launch_zip_file(filepath):
     # Launch Avalon server.
     self.server = Server(self.port)
     thread = threading.Thread(target=self.server.start)
-    thread.deamon = True
+    thread.daemon = True
     thread.start()
 
     # Save workfile path for later.
