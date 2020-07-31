@@ -12,7 +12,6 @@ import contextlib
 import json
 import signal
 import time
-import filecmp
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
