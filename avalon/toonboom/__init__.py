@@ -9,7 +9,8 @@ from .lib import (
     save_file,
     send,
     show,
-    save_scene
+    save_scene,
+    setup_startup_scripts
 )
 
 __all__ = [
@@ -24,5 +25,6 @@ __all__ = [
     "save_file",
     "send",
     "show",
-    "save_scene"
+    "save_scene",
+    "setup_startup_scripts"
 ]
