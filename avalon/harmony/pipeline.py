@@ -135,7 +135,8 @@ def containerise(name,
                  node,
                  context,
                  loader=None,
-                 suffix=None):
+                 suffix=None,
+                 nodes=[]):
     """Imprint node with metadata.
 
     Containerisation enables a tracking of version, author and origin
@@ -158,8 +159,9 @@ def containerise(name,
         "name": name,
         "namespace": namespace,
         "loader": str(loader),
-        "representation": str(context["representation"]["_id"])
-    }
+        "representation": str(context["representation"]["_id"]),
+        "nodes": nodes
+        }
 
     lib.imprint(node, data)
 
