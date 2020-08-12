@@ -265,10 +265,14 @@ def imprint(node_id, data, remove=False):
     """
     scene_data = get_scene_data()
 
-    if node_id in scene_data:
-        scene_data[node_id].update(data)
+    if remove and (node_id in scene_data):
+        scene_data.pop(node_id, None)
     else:
-        scene_data[node_id] = data
+        if node_id in scene_data:
+            scene_data[node_id].update(data)
+        else:
+            scene_data[node_id] = data
+
 
     set_scene_data(scene_data)
 
