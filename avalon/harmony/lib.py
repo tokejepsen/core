@@ -16,6 +16,7 @@ import time
 from .server import Server
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
+from ..toonboom import setup_startup_scripts
 
 self = sys.modules[__name__]
 self.server = None
@@ -38,7 +39,6 @@ def main_thread_listen():
     callback = self.callback_queue.get()
     callback()
 
-
 def launch(application_path):
     """Setup for Harmony launch.
 
@@ -55,7 +55,7 @@ def launch(application_path):
     self.application_path = application_path
 
     # Launch Harmony.
-    os.environ["TOONBOOM_GLOBAL_SCRIPT_LOCATION"] = os.path.dirname(__file__)
+    setup_startup_scripts()
 
     if os.environ.get("AVALON_HARMONY_WORKFILES_ON_LAUNCH", False):
         workfiles.show(save=False)
@@ -109,7 +109,7 @@ def launch_zip_file(filepath):
     # Launch Avalon server.
     self.server = Server(self.port)
     thread = threading.Thread(target=self.server.start)
-    thread.deamon = True
+    thread.daemon = True
     thread.start()
 
     # Save workfile path for later.
