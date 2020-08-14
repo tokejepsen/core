@@ -407,6 +407,9 @@ class AssetModel(TreeModel):
         """Refresh the data for the model."""
 
         self.clear()
+        if not self.dbcon.Session.get("AVALON_PROJECT"):
+            return
+
         self.beginResetModel()
 
         # Get all assets sorted by name
