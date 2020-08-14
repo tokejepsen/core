@@ -20,10 +20,11 @@
       <DispatchInfo>
         <Resources>
           <MainPath>./index.html</MainPath>
+          <CEFCommandLine />
         </Resources>
         <Lifecycle>
-					<AutoVisible>true</AutoVisible>
-				</Lifecycle>
+		  <AutoVisible>true</AutoVisible>
+		</Lifecycle>
         <UI>
           <Type>Panel</Type>
           <Menu>Avalon</Menu>

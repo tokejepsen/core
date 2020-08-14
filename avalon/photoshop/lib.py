@@ -15,6 +15,11 @@ from ..tools import workfiles
 self = sys.modules[__name__]
 self.callback_queue = None
 
+from pype.modules.websocket_server import WebSocketServer
+#from pype.modules.websocket_server.clients.photoshop_client import PhotoshopClient
+import logging
+log = logging.getLogger(__name__)
+
 
 def execute_in_main_thread(func_to_call_from_main_thread):
     self.callback_queue.put(func_to_call_from_main_thread)
@@ -97,10 +102,13 @@ def launch(application):
 
     api.install(photoshop)
     sys.excepthook = safe_excepthook
-
     # Launch Photoshop and the html server.
     process = subprocess.Popen(application, stdout=subprocess.PIPE)
     server = html_server.app.start_server(5000)
+
+    #wsprocess = subprocess.Popen(application, stdout=subprocess.PIPE)
+    websocket_server = WebSocketServer()
+    websocket_server.websocket_thread.start()
 
     while True:
         if process.poll() is not None:
@@ -131,6 +139,9 @@ def launch(application):
     # Wait on Photoshop to close before closing the html server.
     process.wait()
     server.shutdown()
+
+    wsprocess.wait()
+    websocket_server.stop()
 
 
 def imprint(layer, data):
@@ -341,7 +352,11 @@ def get_layers_in_document(document=None):
     Return:
         list: Top-down recursive list of layers.
     """
-    document = document or app().ActiveDocument
+    try:
+        document = document or app().ActiveDocument
+    except Exception as exp:
+        print("Probably no file opened {}".format(exp))
+        return []
     return list(_recurse_layers(list(x for x in document.Layers)).values())
 
 

@@ -13,7 +13,17 @@
     </style>
 </head>
 <body>
+  <script type="text/javascript" src="./client/wsrpc.js"></script>
+  <script type="text/javascript" src="./client/CSInterface.js"></script>
+  <script type="text/javascript" src="./client/loglevel.min.js"></script>
+  
+  <!-- helper library for better debugging of .jsx -->
+  <script type="text/javascript" src="./host/JSX.js"></script>
+  <script type="text/javascript" src="./client/client.js"></script>
+  
   <button onclick="var ifr=document.getElementsByName('iframe')[0]; ifr.src=ifr.src;">Refresh</button>
+  <button id="restartExt" class="Button" onclick="restart_extension()">Restart Extension</button>
   <iframe name="iframe" src="http://127.0.0.1:5000"></iframe>
+  
 </body>
 </html>
