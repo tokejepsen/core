@@ -10,11 +10,11 @@ from . import lib
 from .widgets import (
     SubsetWidget,
     VersionWidget,
-    FamilyListWidget,
-    AssetWidget
+    FamilyListWidget
 )
 from ..loader.widgets import ThumbnailWidget
-from .models import AssetModel
+from ..widgets import AssetWidget
+from ..models import AssetModel
 
 from pypeapp import config
 
@@ -58,7 +58,7 @@ class Window(QtWidgets.QDialog):
         self.show_libraries = show_libraries
 
         assets = AssetWidget(
-            dbcon=self.dbcon, multiselection=True, parent=self
+            multiselection=True, dbcon=self.dbcon, parent=self
         )
         families = FamilyListWidget(dbcon=self.dbcon, parent=self)
         subsets = SubsetWidget(
