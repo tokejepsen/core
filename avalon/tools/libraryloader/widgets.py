@@ -4,21 +4,17 @@ import inspect
 
 from ...vendor import qtawesome, Qt
 from ...vendor.Qt import QtWidgets, QtCore
-from ... import style, api, pipeline
+from ... import api, pipeline
 from . import lib
 from .. import lib as tools_lib
 from ...lib import MasterVersionType
 
-from .. import widgets as tools_widgets
 from ..loader import widgets as loader_widgets
 
-from .models import AssetModel, SubsetsModel, FamiliesFilterProxyModel
-from ..models import RecursiveSortFilterProxyModel
+from .models import SubsetsModel, FamiliesFilterProxyModel
 from ..loader.model import SubsetFilterProxyModel
 from .delegates import VersionDelegate
 from ..delegates import PrettyTimeDelegate
-from ..loader.delegates import AssetDelegate
-from .. views import AssetsView
 
 log = logging.getLogger(__name__)
 
@@ -535,72 +531,3 @@ class FamilyListWidget(loader_widgets.FamilyListWidget):
         self.blockSignals(False)
 
         self.active_changed.emit(self.get_filters())
-
-
-class AssetWidget(tools_widgets.AssetWidget):
-    """A Widget to display a tree of assets with filter
-
-    To list the assets of the active project:
-        >>> # widget = AssetWidget()
-        >>> # widget.refresh()
-        >>> # widget.show()
-
-    """
-
-    assets_refreshed = QtCore.Signal()   # on model refresh
-    selection_changed = QtCore.Signal()  # on view selection change
-    current_changed = QtCore.Signal()    # on view current index change
-
-    def __init__(self, dbcon, multiselection=False, parent=None):
-        super(tools_widgets.AssetWidget, self).__init__(parent=parent)
-        self.setContentsMargins(0, 0, 0, 0)
-
-        self.dbcon = dbcon
-
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
-
-        # Tree View
-        model = AssetModel(dbcon=self.dbcon, parent=self)
-        proxy = RecursiveSortFilterProxyModel()
-        proxy.setSourceModel(model)
-        proxy.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
-
-        view = AssetsView()
-        view.setModel(proxy)
-        if multiselection:
-            asset_delegate = AssetDelegate()
-            view.setSelectionMode(view.ExtendedSelection)
-            view.setItemDelegate(asset_delegate)
-
-        # Header
-        header = QtWidgets.QHBoxLayout()
-
-        icon = qtawesome.icon("fa.refresh", color=style.colors.light)
-        refresh = QtWidgets.QPushButton(icon, "")
-        refresh.setToolTip("Refresh items")
-
-        filter = QtWidgets.QLineEdit()
-        filter.textChanged.connect(proxy.setFilterFixedString)
-        filter.setPlaceholderText("Filter assets..")
-
-        header.addWidget(filter)
-        header.addWidget(refresh)
-
-        # Layout
-        layout.addLayout(header)
-        layout.addWidget(view)
-
-        # Signals/Slots
-        selection = view.selectionModel()
-        selection.selectionChanged.connect(self.selection_changed)
-        selection.currentChanged.connect(self.current_changed)
-        # TODO this should not be set here!!!
-        # self.parent_widget.signal_project_changed.connect(self.refresh)
-        refresh.clicked.connect(self.refresh)
-
-        self.refreshButton = refresh
-        self.model = model
-        self.proxy = proxy
-        self.view = view

@@ -1250,3 +1250,19 @@ QSplitter::handle:horizontal:hover {
 QSplitter {
     border: 0px;
 }
+
+#IconView[mode="icon"] {
+    font-size: 11px;
+    border: 0px;
+    padding: 0px;
+    margin: 0px;
+}
+
+#IconView[mode="icon"]::item  {
+    margin-top: 6px;
+    border: 0px;
+}
+
+#IconView[mode="icon"]::icon {
+    top: 3px;
+}
