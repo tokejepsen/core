@@ -40,6 +40,16 @@
     RPC.connect();
 
     log.warn("connected");
+    
+    function EscapeStringForJSX(str)
+    {
+    // Replaces:
+    //  \ with \\
+    //  ' with \'
+    //  " with \"
+    // See: https://stackoverflow.com/a/3967927/5285364
+        return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
 
     function runEvalScript(script) {
         return new Promise(function(resolve, reject){
@@ -65,19 +75,48 @@
                 });
     });
     
-    RPC.addRoute('Photoshop.save', function (data) {
-            log.warn('Server called client route "save":', data);
-            return runEvalScript("save()")
+    RPC.addRoute('Photoshop.saveAs', function (data) {
+            log.warn('Server called client route "saveAsJPEG":', data);
+            var escapedPath = EscapeStringForJSX(data.image_path);
+            return runEvalScript("saveAs('" + escapedPath + "', " +
+                                         "'" + data.ext + "', " + 
+                                         data.as_copy + ")")
                 .then(function(result){
                     log.warn("save: " + result);
                     return result;
                 });
     });
     
+    RPC.addRoute('Photoshop.set_visible', function (data) {
+            log.warn('Server called client route "saveAsJPEG":', data);
+            return runEvalScript("setVisible(" + data.layer_id + ", " 
+                                 + data.visibility + ")")
+                .then(function(result){
+                    log.warn("setVisible: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.get_active_document_name', function (data) {
+            log.warn('Server called client route "get_active_document_name":', data);
+            return runEvalScript("getActiveDocumentName()")
+                .then(function(result){
+                    log.warn("save: " + result);
+                    return result;
+                });
+    });
+    
+    
     RPC.call('Photoshop.ping').then(function (data) {
-        log.warn('Result for calling server route "ping": ', data);                
+        log.warn('Result for calling server route "ping": ', data);           
     }, function (error) {
         log.warn(error);
     });
+    
+    runEvalScript("setVisible(6, true)")
+                .then(function(result){
+                    log.warn("setVisible: " + result);
+                    return result;
+                });
 
     log.warn("end script");

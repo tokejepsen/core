@@ -16,7 +16,7 @@ self = sys.modules[__name__]
 self.callback_queue = None
 
 from pype.modules.websocket_server import WebSocketServer
-#from pype.modules.websocket_server.clients.photoshop_client import PhotoshopClient
+from pype.modules.websocket_server.clients.photoshop_client import PhotoshopClientStub
 import logging
 log = logging.getLogger(__name__)
 
@@ -218,14 +218,16 @@ def maintained_selection():
 def maintained_visibility():
     """Maintain visibility during context."""
     visibility = {}
-    layers = get_layers_in_document(app().ActiveDocument)
+    photoshop_client = PhotoshopClientStub()
+    layers = photoshop_client.get_layers()
     for layer in layers:
-        visibility[layer.id] = layer.Visible
+        visibility[layer.id] = layer.visible
     try:
         yield
     finally:
         for layer in layers:
-            layer.Visible = visibility[layer.id]
+            photoshop_client.set_visible(layer.id, visibility[layer.id])
+            pass
 
 
 def group_selected_layers():
