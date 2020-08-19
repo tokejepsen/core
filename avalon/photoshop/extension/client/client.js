@@ -75,6 +75,46 @@
                 });
     });
     
+    RPC.addRoute('Photoshop.set_visible', function (data) {
+            log.warn('Server called client route "set_visible":', data);
+            return runEvalScript("setVisible(" + data.layer_id + ", " 
+                                 + data.visibility + ")")
+                .then(function(result){
+                    log.warn("setVisible: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.get_active_document_name', function (data) {
+            log.warn('Server called client route "get_active_document_name":', 
+                      data);
+            return runEvalScript("getActiveDocumentName()")
+                .then(function(result){
+                    log.warn("save: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.get_active_document_full_name', function (data) {
+            log.warn('Server called client route ' +
+                     '"get_active_document_full_name":', data);
+            return runEvalScript("getActiveDocumentFullName()")
+                .then(function(result){
+                    log.warn("save: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.save', function (data) {
+            log.warn('Server called client route "save":', data);
+            
+            return runEvalScript("save()")
+                .then(function(result){
+                    log.warn("save: " + result);
+                    return result;
+                });
+    });
+    
     RPC.addRoute('Photoshop.saveAs', function (data) {
             log.warn('Server called client route "saveAsJPEG":', data);
             var escapedPath = EscapeStringForJSX(data.image_path);
@@ -87,36 +127,23 @@
                 });
     });
     
-    RPC.addRoute('Photoshop.set_visible', function (data) {
-            log.warn('Server called client route "saveAsJPEG":', data);
-            return runEvalScript("setVisible(" + data.layer_id + ", " 
-                                 + data.visibility + ")")
+    RPC.addRoute('Photoshop.imprint', function (data) {
+            log.warn('Server called client route "imprint":', data);
+            var escaped = data.payload.replace(/\n/g, "\\n");
+            log.warn("escaped " + escaped);
+            return runEvalScript("imprint('" + escaped + "')")
                 .then(function(result){
-                    log.warn("setVisible: " + result);
+                    log.warn("imprint: " + result);
                     return result;
                 });
     });
     
-    RPC.addRoute('Photoshop.get_active_document_name', function (data) {
-            log.warn('Server called client route "get_active_document_name":', data);
-            return runEvalScript("getActiveDocumentName()")
-                .then(function(result){
-                    log.warn("save: " + result);
-                    return result;
-                });
-    });
     
     
     RPC.call('Photoshop.ping').then(function (data) {
-        log.warn('Result for calling server route "ping": ', data);           
+        log.warn('Result for calling server route "ping": ', data);      
     }, function (error) {
         log.warn(error);
     });
     
-    runEvalScript("setVisible(6, true)")
-                .then(function(result){
-                    log.warn("setVisible: " + result);
-                    return result;
-                });
-
     log.warn("end script");
