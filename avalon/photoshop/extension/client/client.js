@@ -115,6 +115,57 @@
                 });
     });
     
+    RPC.addRoute('Photoshop.get_selected_layers', function (data) {
+            log.warn('Server called client route "get_selected_layers":', data);
+            
+            return runEvalScript("getSelectedLayers()")
+                .then(function(result){
+                    log.warn("get_selected_layers: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.group_selected_layers', function (data) {
+            log.warn('Server called client route "group_selected_layers":', data);
+            
+            return runEvalScript("group_selected_layers()")
+                .then(function(result){
+                    log.warn("group_selected_layers: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.import_smart_object', function (data) {
+            log.warn('Server called client route "import_smart_object":', data);
+            var escapedPath = EscapeStringForJSX(data.path);
+            return runEvalScript("importSmartObject('" + escapedPath +"')")
+                .then(function(result){
+                    log.warn("import_smart_object: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.replace_smart_object', function (data) {
+            log.warn('Server called client route "replace_smart_object":', data);
+            var escapedPath = EscapeStringForJSX(data.path);
+            return runEvalScript("replaceSmartObjects('" + data.layer + "'," +
+                                                      "'" + escapedPath +"')")
+                .then(function(result){
+                    log.warn("replaceSmartObjects: " + result);
+                    return result;
+                });
+    });
+     
+    RPC.addRoute('Photoshop.select_layers', function (data) {
+            log.warn('Server called client route "select_layers":', data);
+            
+            return runEvalScript("selectLayers()")
+                .then(function(result){
+                    log.warn("select_layers: " + result);
+                    return result;
+                });
+    });
+    
     RPC.addRoute('Photoshop.saveAs', function (data) {
             log.warn('Server called client route "saveAsJPEG":', data);
             var escapedPath = EscapeStringForJSX(data.image_path);

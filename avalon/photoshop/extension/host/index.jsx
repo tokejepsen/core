@@ -162,6 +162,128 @@ function imprint(payload){
     app.activeDocument.info.headline = payload;
 }
 
+//cTID = function(s) { return charIDToTypeID(s); };
+//sTID = function(s) { return stringIDToTypeID(s); };
+
+function getSelectedLayers(doc) {
+    if (doc == null){
+        doc = app.activeDocument;
+    }
+        
+    var selLayers = [];
+    groupSelectedLayers(doc);
+  
+    var group = doc.activeLayer;
+    var layers = group.layers;
+    
+    for (var i = 0; i < layers.length; i++) {
+        var layer = {};
+        layer.id = layers[i].id;
+        layer.name = layers[i].name; 
+        
+        selLayers.push(layer);
+    }
+  
+    _undo();
+  
+    return JSON.stringify(selLayers);
+};
+
+function selectLayers(selectedLayers){
+    /**
+     *  Selects layers from list of Layers(id:X, name:Y)
+     **/
+    selectedLayers = JSON.parse(selectedLayers);
+    log("selectLayers layers " + selectedLayers);
+    var layers = new Array();
+    var id54 = charIDToTypeID( "slct" );
+    var desc12 = new ActionDescriptor();
+    var id55 = charIDToTypeID( "null" );
+    var ref9 = new ActionReference();
+    
+    var existing_layers = JSON.parse(getLayers());
+    var existing_ids = [];
+    for (var y = 0; y < existing_layers.length; y++){
+          existing_ids.push(existing_layers[y]["id"]);
+    }
+    for (var i = 0; i < selectedLayers.length; i++) {
+       // a check to see if the id stil exists
+       var id = selectedLayers[i].id;
+       if(existing_ids.toString().indexOf(id)>=0){
+           layers[i] = charIDToTypeID( "Lyr " );
+           ref9.putIdentifier(layers[i], id);
+       }       
+    }
+    desc12.putReference( id55, ref9 );
+    var id58 = charIDToTypeID( "MkVs" );
+    desc12.putBoolean( id58, false );
+    executeAction( id54, desc12, DialogModes.NO );
+}
+
+function groupSelectedLayers(doc) {
+    if (doc == null){
+        doc = app.activeDocument;
+    }
+    
+    var desc = new ActionDescriptor();
+    var ref = new ActionReference();
+    ref.putClass( stringIDToTypeID('layerSection') );
+    desc.putReference( charIDToTypeID('null'), ref );
+    var lref = new ActionReference();
+    lref.putEnumerated( charIDToTypeID('Lyr '), charIDToTypeID('Ordn'), charIDToTypeID('Trgt') );
+    desc.putReference( charIDToTypeID('From'), lref);
+    executeAction( charIDToTypeID('Mk  '), desc, DialogModes.NO );
+};
+
+function importSmartObject(path){
+    log("importSmartObject");
+    log("path " + path);
+
+    var desc1 = new ActionDescriptor();
+    desc1.putPath( app.charIDToTypeID("null"), new File(path) );
+    desc1.putEnumerated(app.charIDToTypeID("FTcs"), app.charIDToTypeID("QCSt"), 
+                       app.charIDToTypeID("Qcsa"));
+                       
+    var desc2 = new ActionDescriptor();
+    desc2.putUnitDouble(app.charIDToTypeID("Hrzn"), 
+                        app.charIDToTypeID("#Pxl"), 0.0);
+    desc2.putUnitDouble(app.charIDToTypeID("Vrtc"), 
+                        app.charIDToTypeID("#Pxl"), 0.0);
+    
+    desc1.putObject(charIDToTypeID("Ofst"), charIDToTypeID("Ofst"), desc2);
+    executeAction(charIDToTypeID("Plc " ), desc1, DialogModes.NO);
+    
+    var docRef =  app.activeDocument
+    var currentActivelayer = app.activeDocument.activeLayer;
+    
+    var layer = {}
+    layer.id = currentActivelayer.id;
+    layer.name = currentActivelayer.name;                        
+    return layer;     
+}
+
+function replaceSmartObjects(layer, path){
+    log("replaceSmartObjects");
+    layer = JSON.parse(layer);
+    
+    var desc = new ActionDescriptor();
+    
+    var ref = new ActionReference();
+    ref.putIdentifier(stringIDToTypeID("layer"), layer.id);
+    desc.putReference(stringIDToTypeID("null"), ref);
+    
+    desc.putPath(charIDToTypeID('null'), new File(path) );
+    desc.putInteger(charIDToTypeID("PgNm"), 1);
+    executeAction(stringIDToTypeID('placedLayerReplaceContents'), 
+                  desc, DialogModes.NO );
+}
+
+function _undo() {
+    executeAction(charIDToTypeID("undo", undefined, DialogModes.NO));
+};
+
+var path = 'c:\\projects\\SmartObject.psd';
+log(importSmartObject(path));
 log.show();
 
 
