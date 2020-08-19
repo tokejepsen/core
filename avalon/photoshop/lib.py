@@ -16,9 +16,8 @@ self = sys.modules[__name__]
 self.callback_queue = None
 
 from pype.modules.websocket_server import WebSocketServer
-from pype.modules.websocket_server.clients.photoshop_client import PhotoshopClientStub
-import logging
-log = logging.getLogger(__name__)
+from pype.modules.websocket_server.clients.photoshop_client \
+     import PhotoshopClientStub
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
@@ -106,7 +105,6 @@ def launch(application):
     process = subprocess.Popen(application, stdout=subprocess.PIPE)
     server = html_server.app.start_server(5000)
 
-    #wsprocess = subprocess.Popen(application, stdout=subprocess.PIPE)
     websocket_server = WebSocketServer()
     websocket_server.websocket_thread.start()
 
@@ -207,11 +205,12 @@ def read(layer):
 @contextlib.contextmanager
 def maintained_selection():
     """Maintain selection during context."""
-    selection = get_selected_layers()
+    photoshop_client = PhotoshopClientStub()
+    selection = photoshop_client.get_selected_layers()
     try:
         yield selection
     finally:
-        select_layers(selection)
+        photoshop_client.select_layers(selection)
 
 
 @contextlib.contextmanager

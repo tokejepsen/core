@@ -4,6 +4,9 @@ from ..vendor import Qt
 
 import pyblish.api
 
+from pype.modules.websocket_server.clients.photoshop_client \
+     import PhotoshopClientStub
+
 
 def install():
     """Install Photoshop-specific functionality of avalon-core.
@@ -25,8 +28,12 @@ def ls():
         dict: container
 
     """
-    for layer in lib.get_layers_in_document():
-        data = lib.read(layer)
+    photoshopClient = PhotoshopClientStub()  # only after Photoshop is up
+    if not photoshopClient.client:
+        return
+
+    for layer in photoshopClient.get_layers():
+        data = photoshopClient.read(layer)
 
         # Skip non-tagged layers.
         if not data:
@@ -53,7 +60,8 @@ class Creator(api.Creator):
         # Photoshop can have multiple LayerSets with the same name, which does
         # not work with Avalon.
         msg = "Instance with name \"{}\" already exists.".format(self.name)
-        for layer in lib.get_layers_in_document():
+        photoshopClient = PhotoshopClientStub()  # only after Photoshop is up
+        for layer in photoshopClient.get_layers():
             if self.name.lower() == layer.Name.lower():
                 msg = Qt.QtWidgets.QMessageBox()
                 msg.setIcon(Qt.QtWidgets.QMessageBox.Warning)
@@ -74,7 +82,7 @@ class Creator(api.Creator):
             # Create group/layer relationship.
             group.Name = self.name
 
-            lib.imprint(group, self.data)
+            photoshopClient.imprint(group, self.data)
 
         return group
 
@@ -111,7 +119,7 @@ def containerise(name,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
     }
-
-    lib.imprint(layer, data)
+    photoshopClient = PhotoshopClientStub()
+    photoshopClient.imprint(layer, data)
 
     return layer
