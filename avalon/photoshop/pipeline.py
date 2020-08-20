@@ -29,6 +29,7 @@ def ls():
 
     """
     photoshopClient = PhotoshopClientStub()  # only after Photoshop is up
+    print("photoshopClient.client: {}".format(photoshopClient.client))
     if not photoshopClient.client:
         return
 
