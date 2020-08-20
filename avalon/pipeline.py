@@ -47,6 +47,7 @@ AVALON_CONTAINER_ID = "pyblish.avalon.container"
 
 HOST_WORKFILE_EXTENSIONS = {
     "blender": [".blend"],
+    "celaction": [".scn"],
     "fusion": [".comp"],
     "harmony": [".zip"],
     "houdini": [".hip", ".hiplc", ".hipnc"],
