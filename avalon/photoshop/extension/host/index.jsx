@@ -34,6 +34,17 @@ function getLayerTypeWithName(layerName) {
 }
 
 function getLayers() {
+    /**
+     * Get json representation of list of layers
+     * 
+     * Format of single layer info:
+     *      id :    number
+     *      name:   string
+     *      group:  boolean - true if layer is a group
+     *      parents:array - list of ids of parent groups
+     *      type:   string - type of layer guessed from its name
+     *      visible:boolean - true if visible
+     **/
     var ref1 = new ActionReference();
     ref1.putEnumerated(charIDToTypeID('Dcmn'), charIDToTypeID('Ordn'), 
                        charIDToTypeID('Trgt'));
@@ -43,7 +54,8 @@ function getLayers() {
     var layers = [];
     var layer = {};
     
-    groupId = 0;
+    log("cnt " + count);
+    var parents = [];
     for (var i = count; i >= 1; i--) {
       var layer = {};
       var ref2 = new ActionReference();
@@ -52,31 +64,34 @@ function getLayers() {
       var desc = executeActionGet(ref2);  // Access layer index #i
       var layerSection = typeIDToStringID(desc.getEnumerationValue(
                                           stringIDToTypeID('layerSection')));
-      group = false;
-      if (layerSection == 'layerSectionStart') { // Group start and end
-        group = true;
-        groupId = desc.getInteger(stringIDToTypeID("layerID"));              
-      }
-      if (layerSection == 'layerSectionEnd') {
-          continue;
-      } 
       
+      layer.id = desc.getInteger(stringIDToTypeID("layerID")); 
       layer.name = desc.getString(stringIDToTypeID("name"));
-      layer.groupId = groupId;
-      layer.group = group; //true if group, LayerSet, false for reg ArtLayer
+      layer.group = false
+      layer.parents = parents;
       layer.type = getLayerTypeWithName(layer.name);
-      layer.id = desc.getInteger(stringIDToTypeID("layerID"));
       layer.visible = desc.getBoolean(stringIDToTypeID("visible"));
       //log(" name: " + layer.name + " groupId " + layer.groupId + 
       //" group " + layer.group); 
-      
-      layers.push(layer);
+
+      if (layerSection == 'layerSectionStart') { // Group start and end
+        parents.push(layer.id); 
+        layer.group = true;                    
+      }
+      if (layerSection == 'layerSectionEnd') {
+        parents.pop();
+        continue;
+      } 
+      layers.push(JSON.stringify(layer));
 
     }
-    return JSON.stringify(layers);
+    return '[' + layers + ']';
 }
 
 function setVisible(layer_id, visibility){
+    /**
+     * Sets particular 'layer_id'<int> to 'visibility' if true > show
+     **/
     var desc = new ActionDescriptor();
     var ref = new ActionReference();
     ref.putIdentifier(stringIDToTypeID("layer"), layer_id);
@@ -162,24 +177,32 @@ function imprint(payload){
     app.activeDocument.info.headline = payload;
 }
 
-//cTID = function(s) { return charIDToTypeID(s); };
-//sTID = function(s) { return stringIDToTypeID(s); };
-
 function getSelectedLayers(doc) {
+    /**
+     * Returns json representation of currently selected layers
+     **/
     if (doc == null){
         doc = app.activeDocument;
     }
         
     var selLayers = [];
-    groupSelectedLayers(doc);
+    grp = groupSelectedLayers(doc);
   
     var group = doc.activeLayer;
     var layers = group.layers;
     
+    log("len " + layers.length);
     for (var i = 0; i < layers.length; i++) {
         var layer = {};
         layer.id = layers[i].id;
-        layer.name = layers[i].name; 
+        layer.name = layers[i].name;
+        var t = layers[i].kind;
+        if ((typeof t !== 'undefined') && 
+            (layers[i].kind.toString() == 'LayerKind.NORMAL')){
+            layer.group = false;
+        }else{
+            layer.group = true;
+        }
         
         selLayers.push(layer);
     }
@@ -220,7 +243,11 @@ function selectLayers(selectedLayers){
     executeAction( id54, desc12, DialogModes.NO );
 }
 
-function groupSelectedLayers(doc) {
+function groupSelectedLayers(doc, name) {
+    /**
+     * Groups selected layers into new group.
+     * Returns json representation of Layer for server to consume
+     **/
     if (doc == null){
         doc = app.activeDocument;
     }
@@ -233,6 +260,18 @@ function groupSelectedLayers(doc) {
     lref.putEnumerated( charIDToTypeID('Lyr '), charIDToTypeID('Ordn'), charIDToTypeID('Trgt') );
     desc.putReference( charIDToTypeID('From'), lref);
     executeAction( charIDToTypeID('Mk  '), desc, DialogModes.NO );
+    
+    var group = doc.activeLayer;
+    if (name){
+        group.name = name;
+    }   
+    var layer = {};
+    layer.id = group.id;
+    layer.name = group.name;
+    layer.group = true; 
+    log("layer " + layer);
+    
+    return JSON.stringify(layer);        
 };
 
 function importSmartObject(path){
@@ -282,8 +321,18 @@ function _undo() {
     executeAction(charIDToTypeID("undo", undefined, DialogModes.NO));
 };
 
-var path = 'c:\\projects\\SmartObject.psd';
-log(importSmartObject(path));
-log.show();
+function createGroup(name){
+    /**
+     * Creates new group with a 'name'
+     * Because of asynchronous nature, only group.id is available
+     **/
+    group = app.activeDocument.layerSets.add();
+    group.name = name;
+       
+    return group.id;  // only id available at this time :|
+}
+
+//log(groupSelectedLayers());
+//log.show();
 
 

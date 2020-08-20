@@ -125,10 +125,22 @@
                 });
     });
     
-    RPC.addRoute('Photoshop.group_selected_layers', function (data) {
-            log.warn('Server called client route "group_selected_layers":', data);
+    RPC.addRoute('Photoshop.create_group', function (data) {
+            log.warn('Server called client route "create_group":', data);
             
-            return runEvalScript("group_selected_layers()")
+            return runEvalScript("createGroup('" + data.name + "')")
+                .then(function(result){
+                    log.warn("createGroup: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.group_selected_layers', function (data) {
+            log.warn('Server called client route "group_selected_layers":', 
+                     data);
+            
+            return runEvalScript("groupSelectedLayers(null, "+
+                                 "'" + data.name +"')")
                 .then(function(result){
                     log.warn("group_selected_layers: " + result);
                     return result;
@@ -181,7 +193,6 @@
     RPC.addRoute('Photoshop.imprint', function (data) {
             log.warn('Server called client route "imprint":', data);
             var escaped = data.payload.replace(/\n/g, "\\n");
-            log.warn("escaped " + escaped);
             return runEvalScript("imprint('" + escaped + "')")
                 .then(function(result){
                     log.warn("imprint: " + result);
