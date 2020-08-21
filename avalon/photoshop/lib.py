@@ -95,15 +95,15 @@ def safe_excepthook(*args):
 
 
 def launch(application):
-    """Starts the web server that will be hosted in the Photoshop extension.
+    """Starts the websocket server that will be hosted
+       in the Photoshop extension.
     """
     from avalon import api, photoshop
 
     api.install(photoshop)
     sys.excepthook = safe_excepthook
-    # Launch Photoshop and the html server.
+    # Launch Photoshop and the websocket server.
     process = subprocess.Popen(application, stdout=subprocess.PIPE)
-    server = html_server.app.start_server(5000)
 
     websocket_server = WebSocketServer()
     websocket_server.websocket_thread.start()
@@ -111,7 +111,7 @@ def launch(application):
     while True:
         if process.poll() is not None:
             print("Photoshop process is not alive. Exiting")
-            server.shutdown()
+            websocket_server.shutdown()
             sys.exit(1)
         try:
             _app = photoshop.app()
@@ -134,10 +134,7 @@ def launch(application):
     while True:
         main_thread_listen()
 
-    # Wait on Photoshop to close before closing the html server.
-    process.wait()
-    server.shutdown()
-
+    # Wait on Photoshop to close before closing the websocket server
     wsprocess.wait()
     websocket_server.stop()
 

@@ -1,45 +1,29 @@
-    function restart_extension() {
-      log.warn("restarting!");
-      try {
-          ////////////////////////////////////////////////////////////////////////////////////////////////////
-          // if we're restarting then we should remove all the eventListeners so we don't get double events //
-          // Try get the point over                                                                         //
-          // CRITICAL MAKE SURE TO CLOSE NULLIFY ETC. ANY LOOSE WATCHERS, EVENTLISTENERS, GLOBALS ETC.      //
-          // CRITICAL MAKE SURE TO CLOSE NULLIFY ETC. ANY LOOSE WATCHERS, EVENTLISTENERS, GLOBALS ETC.      //
-          // CRITICAL MAKE SURE TO CLOSE NULLIFY ETC. ANY LOOSE WATCHERS, EVENTLISTENERS, GLOBALS ETC.      //
-          // CRITICAL MAKE SURE TO CLOSE NULLIFY ETC. ANY LOOSE WATCHERS, EVENTLISTENERS, GLOBALS ETC.      //
-          // for example watcher.close();                                                                   //
-          // Then reset the UI to load it's page (if it hasn't change page)                                 //
-          ////////////////////////////////////////////////////////////////////////////////////////////////////
-          process.removeAllListeners();
-          window.location.href = "./index.html";
-      } catch (e) {
-          window.location.href = "./index.html";
-      }
-    }
-    
-    function myCallBack(){
-        log.warn("Triggered index.jsx");
-    }
+    // client facing part of extension
     
     var logReturn = function(result){ log.warn('Result: ' + result);};
     
     var csInterface = new CSInterface();
-    jsx.evalFile('./host/index.jsx', myCallBack);
     
     log.warn("script start");
 
     WSRPC.DEBUG = true;
     WSRPC.TRACE = true;
-
-    var url = (window.location.protocol==="https):"?"wss://":"ws://") +
-              window.location.host + '/ws/';
-    url = 'ws://localhost:8099/ws/';
-    RPC = new WSRPC(url, 5000);
+  
+    var url = 'ws://localhost:8099/ws/';
+    RPC = new WSRPC(url, 5000); // spin connection
 
     RPC.connect();
 
     log.warn("connected");
+    
+    /*   uncomment only for debugging, without it any change in .jsx will
+         be noticed only after restart of PS
+    function myCallBack(){
+        log.warn("Triggered index.jsx");
+    }
+    jsx.evalFile('./host/index.jsx', myCallBack);
+    */
+    
     
     function EscapeStringForJSX(str)
     {
@@ -52,6 +36,8 @@
     }
 
     function runEvalScript(script) {
+        // because of asynchronous nature of functions in jsx
+        // this waits for response
         return new Promise(function(resolve, reject){
             csInterface.evalScript(script, resolve);
         });
@@ -158,7 +144,7 @@
     });
     
     RPC.addRoute('Photoshop.replace_smart_object', function (data) {
-            log.warn('Server called client route "replace_smart_object":', data);
+            log.warn('Server called route "replace_smart_object":', data);
             var escapedPath = EscapeStringForJSX(data.path);
             return runEvalScript("replaceSmartObjects('" + data.layer + "'," +
                                                       "'" + escapedPath +"')")
@@ -199,11 +185,15 @@
                     return result;
                 });
     });
-    
-    
-    
+      
     RPC.call('Photoshop.ping').then(function (data) {
-        log.warn('Result for calling server route "ping": ', data);      
+        log.warn('Result for calling server route "ping": ', data);
+        return runEvalScript("ping()")
+                .then(function(result){
+                    log.warn("ping: " + result);
+                    return result;
+                });
+              
     }, function (error) {
         log.warn(error);
     });
