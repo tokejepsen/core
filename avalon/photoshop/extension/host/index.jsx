@@ -5,8 +5,8 @@ var LogFactory=function(file,write,store,level,defaultStatus,continuing){if(file
 
 var log = new LogFactory('myLog.log'); // =>; creates the new log factory
 
-function test(){
-    return "testdd";
+function fileOpen(path){
+    return app.open(new File(path));
 }
 
 function getLayerTypeWithName(layerName) {
@@ -39,13 +39,15 @@ function getLayerTypeWithName(layerName) {
 
 function getLayers() {
     /**
-     * Get json representation of list of layers
+     * Get json representation of list of layers. 
+     * Much faster this way than in DOM traversal (2s vs 45s on same file)
      * 
      * Format of single layer info:
      *      id :    number
      *      name:   string
      *      group:  boolean - true if layer is a group
-     *      parents:array - list of ids of parent groups
+     *      parents:array - list of ids of parent groups, useful for selection 
+     *          all children layers from parent layerSet (eg. group)
      *      type:   string - type of layer guessed from its name
      *      visible:boolean - true if visible
      **/
@@ -115,6 +117,10 @@ function getHeadline(){
     return headline;
 }
 
+function isSaved(){
+    return app.activeDocument.saved;
+}
+
 function save(){
     /** Saves active document **/        
     return app.activeDocument.save();
@@ -174,7 +180,9 @@ function getActiveDocumentFullName(){
 
 function imprint(payload){
     /**
-     *  Returns headline of current document with metadata 
+     *  Sets headline content of current document with metadata. Stores
+     *  information about assets created through Avalon.
+     *  Content accessible in PS through File > File Info
      * 
      **/
     app.activeDocument.info.headline = payload;
@@ -182,7 +190,11 @@ function imprint(payload){
 
 function getSelectedLayers(doc) {
     /**
-     * Returns json representation of currently selected layers
+     * Returns json representation of currently selected layers.
+     * Works in three steps - 1) creates new group with selected layers
+     *                        2) traverses this group
+     *                        3) deletes newly created group, not neede
+     * Bit weird, but Adobe..
      **/
     if (doc == null){
         doc = app.activeDocument;
@@ -194,7 +206,6 @@ function getSelectedLayers(doc) {
     var group = doc.activeLayer;
     var layers = group.layers;
     
-    log("len " + layers.length);
     for (var i = 0; i < layers.length; i++) {
         var layer = {};
         layer.id = layers[i].id;
@@ -220,7 +231,6 @@ function selectLayers(selectedLayers){
      *  Selects layers from list of Layers(id:X, name:Y)
      **/
     selectedLayers = JSON.parse(selectedLayers);
-    log("selectLayers layers " + selectedLayers);
     var layers = new Array();
     var id54 = charIDToTypeID( "slct" );
     var desc12 = new ActionDescriptor();
@@ -260,7 +270,8 @@ function groupSelectedLayers(doc, name) {
     ref.putClass( stringIDToTypeID('layerSection') );
     desc.putReference( charIDToTypeID('null'), ref );
     var lref = new ActionReference();
-    lref.putEnumerated( charIDToTypeID('Lyr '), charIDToTypeID('Ordn'), charIDToTypeID('Trgt') );
+    lref.putEnumerated( charIDToTypeID('Lyr '), charIDToTypeID('Ordn'), 
+                        charIDToTypeID('Trgt') );
     desc.putReference( charIDToTypeID('From'), lref);
     executeAction( charIDToTypeID('Mk  '), desc, DialogModes.NO );
     
@@ -272,13 +283,15 @@ function groupSelectedLayers(doc, name) {
     layer.id = group.id;
     layer.name = group.name;
     layer.group = true; 
-    log("layer " + layer);
     
     return JSON.stringify(layer);        
 };
 
 function importSmartObject(path){
-
+    /**
+     *  Creates new layer with an image from 'path'
+     *  
+     **/
     var desc1 = new ActionDescriptor();
     desc1.putPath( app.charIDToTypeID("null"), new File(path) );
     desc1.putEnumerated(app.charIDToTypeID("FTcs"), app.charIDToTypeID("QCSt"), 
@@ -299,10 +312,14 @@ function importSmartObject(path){
     var layer = {}
     layer.id = currentActivelayer.id;
     layer.name = currentActivelayer.name;                        
-    return layer;     
+    return JSON.stringify(layer);     
 }
 
 function replaceSmartObjects(layer, path){
+    /**
+     *  Updates content of 'layer' with an image from 'path'
+     *  
+     **/
     layer = JSON.parse(layer);
     
     var desc = new ActionDescriptor();
@@ -317,10 +334,6 @@ function replaceSmartObjects(layer, path){
                   desc, DialogModes.NO );
 }
 
-function _undo() {
-    executeAction(charIDToTypeID("undo", undefined, DialogModes.NO));
-};
-
 function createGroup(name){
     /**
      * Creates new group with a 'name'
@@ -331,8 +344,14 @@ function createGroup(name){
        
     return group.id;  // only id available at this time :|
 }
+
+function _undo() {
+    executeAction(charIDToTypeID("undo", undefined, DialogModes.NO));
+};
+
+
 // triggers when panel is opened, good for debugging
-//log(groupSelectedLayers());   
+//log(isSaved());   
 //log.show();
 
 

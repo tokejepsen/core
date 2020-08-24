@@ -1,4 +1,7 @@
-    // client facing part of extension
+    // client facing part of extension, creates WSRPC client (jsx cannot 
+    // do that)
+    // consumes RPC calls from server (Pype) calls ./host/index.jsx and 
+    // returns values back (in json format)
     
     var logReturn = function(result){ log.warn('Result: ' + result);};
     
@@ -16,17 +19,14 @@
 
     log.warn("connected");
     
-    /*   uncomment only for debugging, without it any change in .jsx will
-         be noticed only after restart of PS
     function myCallBack(){
         log.warn("Triggered index.jsx");
     }
-    jsx.evalFile('./host/index.jsx', myCallBack);
-    */
+    // importing through manifest.xml isn't working because relative paths
+    // possibly TODO
+    jsx.evalFile('./host/index.jsx', myCallBack); 
     
-    
-    function EscapeStringForJSX(str)
-    {
+    function EscapeStringForJSX(str){
     // Replaces:
     //  \ with \\
     //  ' with \'
@@ -42,6 +42,16 @@
             csInterface.evalScript(script, resolve);
         });
     }
+    
+    RPC.addRoute('Photoshop.open', function (data) {
+            log.warn('Server called client route "open":', data);
+            var escapedPath = EscapeStringForJSX(data.path);
+            return runEvalScript("fileOpen('" + escapedPath +"')")
+                .then(function(result){
+                    log.warn("open: " + result);
+                    return result;
+                });
+    });
     
     RPC.addRoute('Photoshop.read', function (data) {
             log.warn('Server called client route "read":', data);
@@ -63,8 +73,8 @@
     
     RPC.addRoute('Photoshop.set_visible', function (data) {
             log.warn('Server called client route "set_visible":', data);
-            return runEvalScript("setVisible(" + data.layer_id + ", " 
-                                 + data.visibility + ")")
+            return runEvalScript("setVisible(" + data.layer_id + ", " +
+                                 data.visibility + ")")
                 .then(function(result){
                     log.warn("setVisible: " + result);
                     return result;
@@ -160,6 +170,16 @@
             return runEvalScript("selectLayers()")
                 .then(function(result){
                     log.warn("select_layers: " + result);
+                    return result;
+                });
+    });
+    
+    RPC.addRoute('Photoshop.is_saved', function (data) {
+            log.warn('Server called client route "is_saved":', data);
+            
+            return runEvalScript("isSaved()")
+                .then(function(result){
+                    log.warn("is_saved: " + result);
                     return result;
                 });
     });

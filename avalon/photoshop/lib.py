@@ -1,4 +1,3 @@
-import json
 import contextlib
 import subprocess
 import os
@@ -8,16 +7,16 @@ import importlib
 import time
 import traceback
 
-from ..tools import html_server
 from ..vendor.Qt import QtWidgets
 from ..tools import workfiles
 
+from pype.modules.websocket_server import WebSocketServer
+from pype.modules.websocket_server.stubs.photoshop_server_stub import (
+    PhotoshopServerStub
+)
+
 self = sys.modules[__name__]
 self.callback_queue = None
-
-from pype.modules.websocket_server import WebSocketServer
-from pype.modules.websocket_server.clients.photoshop_client \
-     import PhotoshopClientStub
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
@@ -55,39 +54,23 @@ def show(module_name):
     app.exec_()
 
 
-def get_com_objects():
-    """Wrapped com objects.
+class ConnectionNotEstablishedYet(Exception):
+    pass
 
-    This could later query whether the platform is Windows or Mac.
+
+def stub():
     """
-    from . import com_objects
-    return com_objects
-
-
-def Dispatch(application):
-    """Wrapped Dispatch function.
-
-    This could later query whether the platform is Windows or Mac.
-
-    Args:
-        application (str): Application to dispatch.
+        Convenience function to get server RPC stub to call methods directed
+        for host (Photoshop).
+        It expects already created connection, started from client.
+        Currently created when panel is opened (PS: Window>Extensions>Avalon)
+    :return: <PhotoshopClientStub> where functions could be called from
     """
-    from win32com.client import Dispatch
-    return Dispatch(application)
+    stub = PhotoshopServerStub()
+    if not stub.client:
+        raise ConnectionNotEstablishedYet("Connection is not created yet")
 
-
-def app():
-    """Convenience function to get the Photoshop app.
-
-    This could later query whether the platform is Windows or Mac.
-
-    This needs to be a function call because when calling Dispatch directly
-    from a different thread will result in "CoInitialize has not been called"
-    which can be fixed with pythoncom.CoInitialize(). However even then it will
-    still error with "The application called an interface that was marshalled
-    for a different thread"
-    """
-    return Dispatch("Photoshop.Application")
+    return stub
 
 
 def safe_excepthook(*args):
@@ -111,23 +94,22 @@ def launch(application):
     while True:
         if process.poll() is not None:
             print("Photoshop process is not alive. Exiting")
-            websocket_server.shutdown()
+            websocket_server.close()
             sys.exit(1)
         try:
-            _app = photoshop.app()
-            if _app:
+            _stub = photoshop.stub()
+            if _stub:
                 break
         except Exception:
-            time.sleep(0.1)
+            time.sleep(0.5)
 
     # Wait for application launch to show Workfiles.
     if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", False):
         # Wait for Photoshop launch.
-        if photoshop.app():
-            workfiles.show(save=False)
+        workfiles.show(save=False)
 
     # Wait for Photoshop launch.
-    if photoshop.app():
+    if photoshop.stub():
         api.emit("application.launched")
 
     self.callback_queue = queue.Queue()
@@ -135,288 +117,31 @@ def launch(application):
         main_thread_listen()
 
     # Wait on Photoshop to close before closing the websocket server
-    wsprocess.wait()
+    process.wait()
     websocket_server.stop()
-
-
-def imprint(layer, data):
-    """Write `data` to the active document "headline" field as json.
-
-    Arguments:
-        layer (win32com.client.CDispatch): COMObject of the layer.
-        data (dict): Dictionary of key/value pairs.
-
-    Example:
-        >>> from avalon.photoshop import lib
-        >>> layer = app.ActiveDocument.ArtLayers.Add()
-        >>> data = {"str": "someting", "int": 1, "float": 0.32, "bool": True}
-        >>> lib.imprint(layer, data)
-    """
-    _app = app()
-
-    layers_data = {}
-    try:
-        layers_data = json.loads(_app.ActiveDocument.Info.Headline)
-    except json.decoder.JSONDecodeError:
-        pass
-
-    # json.dumps writes integer values in a dictionary to string, so
-    # anticipating it here.
-    if str(layer.id) in layers_data:
-        layers_data[str(layer.id)].update(data)
-    else:
-        layers_data[str(layer.id)] = data
-
-    # Ensure only valid ids are stored.
-    layer_ids = []
-    for layer in get_layers_in_document():
-        layer_ids.append(layer.id)
-
-    cleaned_data = {}
-    for id in layers_data:
-        if int(id) in layer_ids:
-            cleaned_data[id] = layers_data[id]
-
-    # Write date to FileInfo headline.
-    _app.ActiveDocument.Info.Headline = json.dumps(cleaned_data, indent=4)
-
-
-def read(layer):
-    """Read the layer metadata in to a dict
-
-    Args:
-        layer (win32com.client.CDispatch): COMObject of the layer.
-
-    Returns:
-        dict
-    """
-    layers_data = {}
-    try:
-        layers_data = json.loads(app().ActiveDocument.Info.Headline)
-    except json.decoder.JSONDecodeError:
-        pass
-
-    return layers_data.get(str(layer.id))
 
 
 @contextlib.contextmanager
 def maintained_selection():
     """Maintain selection during context."""
-    photoshop_client = PhotoshopClientStub()
-    selection = photoshop_client.get_selected_layers()
+    selection = stub().get_selected_layers()
     try:
         yield selection
     finally:
-        photoshop_client.select_layers(selection)
+        stub().select_layers(selection)
 
 
 @contextlib.contextmanager
 def maintained_visibility():
     """Maintain visibility during context."""
     visibility = {}
-    photoshop_client = PhotoshopClientStub()
-    layers = photoshop_client.get_layers()
+    layers = stub().get_layers()
     for layer in layers:
         visibility[layer.id] = layer.visible
     try:
         yield
     finally:
         for layer in layers:
-            photoshop_client.set_visible(layer.id, visibility[layer.id])
+            stub().set_visible(layer.id, visibility[layer.id])
             pass
 
-
-def group_selected_layers():
-    """Create a group and adds the selected layers.
-
-    Returns:
-        LayerSet: Created group.
-    """
-
-    _app = app()
-
-    ref = Dispatch("Photoshop.ActionReference")
-    ref.PutClass(_app.StringIDToTypeID("layerSection"))
-
-    lref = Dispatch("Photoshop.ActionReference")
-    lref.PutEnumerated(
-        _app.CharIDToTypeID("Lyr "),
-        _app.CharIDToTypeID("Ordn"),
-        _app.CharIDToTypeID("Trgt")
-    )
-
-    desc = Dispatch("Photoshop.ActionDescriptor")
-    desc.PutReference(_app.CharIDToTypeID("null"), ref)
-    desc.PutReference(_app.CharIDToTypeID("From"), lref)
-
-    _app.ExecuteAction(
-        _app.CharIDToTypeID("Mk  "),
-        desc,
-        get_com_objects().constants().psDisplayNoDialogs
-    )
-
-    return _app.ActiveDocument.ActiveLayer
-
-
-def get_selected_layers():
-    """Get the selected layers
-
-    Returns:
-        list
-    """
-    _app = app()
-
-    group_selected_layers()
-
-    selection = list(_app.ActiveDocument.ActiveLayer.Layers)
-
-    _app.ExecuteAction(
-        _app.CharIDToTypeID("undo"),
-        None,
-        get_com_objects().constants().psDisplayNoDialogs
-    )
-
-    return selection
-
-
-def get_layers_by_ids(ids):
-    return [x for x in app().ActiveDocument.Layers if x.id in ids]
-
-
-def select_layers(layers):
-    """Selects multiple layers
-
-    Args:
-        layers (list): List of COMObjects.
-    """
-    _app = app()
-
-    ref = Dispatch("Photoshop.ActionReference")
-    for id in [x.id for x in layers]:
-        ref.PutIdentifier(_app.CharIDToTypeID("Lyr "), id)
-
-    desc = Dispatch("Photoshop.ActionDescriptor")
-    desc.PutReference(_app.CharIDToTypeID("null"), ref)
-    desc.PutBoolean(_app.CharIDToTypeID("MkVs"), False)
-
-    try:
-        _app.ExecuteAction(
-            _app.CharIDToTypeID("slct"),
-            desc,
-            get_com_objects().constants().psDisplayNoDialogs
-        )
-    except Exception:
-        pass
-
-
-def _recurse_layers(layers):
-    """Recursively get layers in provided layers.
-
-    Args:
-        layers (list): List of COMObjects.
-
-    Returns:
-        List of COMObjects.
-    """
-    result = {}
-    for layer in layers:
-        result[layer.id] = layer
-        if layer.LayerType == get_com_objects().constants().psLayerSet:
-            result.update(_recurse_layers(list(layer.Layers)))
-
-    return result
-
-
-def get_layers_in_layers(layers):
-    """Get all layers in layers.
-
-    Args:
-        layers (list of COMObjects): layers to get layers within. Typically
-            LayerSets.
-
-    Return:
-        list: Top-down recursive list of layers.
-    """
-    return list(_recurse_layers(layers).values())
-
-
-def get_layers_in_document(document=None):
-    """Get all layers in a document.
-
-    Args:
-        document (win32com.client.CDispatch): COMObject of the document. If
-            None is supplied the ActiveDocument is used.
-
-    Return:
-        list: Top-down recursive list of layers.
-    """
-    try:
-        document = document or app().ActiveDocument
-    except Exception as exp:
-        print("Probably no file opened {}".format(exp))
-        return []
-    return list(_recurse_layers(list(x for x in document.Layers)).values())
-
-
-def import_smart_object(path):
-    """Import the file at `path` as a smart object to active document.
-
-    Args:
-        path (str): File path to import.
-
-    Return:
-        COMObject: Smart object layer.
-    """
-    _app = app()
-
-    desc1 = Dispatch("Photoshop.ActionDescriptor")
-    desc1.PutPath(_app.CharIDToTypeID("null"), path)
-    desc1.PutEnumerated(
-        _app.CharIDToTypeID("FTcs"),
-        _app.CharIDToTypeID("QCSt"),
-        _app.CharIDToTypeID("Qcsa")
-    )
-
-    desc2 = Dispatch("Photoshop.ActionDescriptor")
-    desc2.PutUnitDouble(
-        _app.CharIDToTypeID("Hrzn"), _app.CharIDToTypeID("#Pxl"), 0.0
-    )
-    desc2.PutUnitDouble(
-        _app.CharIDToTypeID("Vrtc"), _app.CharIDToTypeID("#Pxl"), 0.0
-    )
-
-    desc1.PutObject(
-        _app.CharIDToTypeID("Ofst"), _app.CharIDToTypeID("Ofst"), desc2
-    )
-
-    _app.ExecuteAction(
-        _app.CharIDToTypeID("Plc "),
-        desc1,
-        get_com_objects().constants().psDisplayNoDialogs
-    )
-    layer = get_selected_layers()[0]
-    layer.MoveToBeginning(_app.ActiveDocument)
-
-    return layer
-
-
-def replace_smart_object(layer, path):
-    """Replace the smart object `layer` with file at `path`
-
-    Args:
-        layer (win32com.client.CDispatch): COMObject of the layer.
-        path (str): File to import.
-    """
-    _app = app()
-
-    _app.ActiveDocument.ActiveLayer = layer
-
-    desc = Dispatch("Photoshop.ActionDescriptor")
-    desc.PutPath(_app.CharIDToTypeID("null"), path.replace("\\", "/"))
-    desc.PutInteger(_app.CharIDToTypeID("PgNm"), 1)
-
-    _app.ExecuteAction(
-        _app.StringIDToTypeID("placedLayerReplaceContents"),
-        desc,
-        get_com_objects().constants().psDisplayNoDialogs
-    )
