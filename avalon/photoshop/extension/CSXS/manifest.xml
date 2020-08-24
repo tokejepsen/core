@@ -24,17 +24,22 @@
         </Resources>
         <Lifecycle>
 		  <AutoVisible>true</AutoVisible>
+          <StartOn>
+            <!-- Photoshop dispatches this event on startup -->
+            <Event>applicationActivate</Event>
+            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>
+          </StartOn>
 		</Lifecycle>
         <UI>
           <Type>Panel</Type>
           <Menu>Avalon</Menu>
           <Geometry>
             <Size>
-              <Width>150</Width>
-              <Height>100</Height>
+              <Width>300</Width>
+              <Height>140</Height>
             </Size>
             <MaxSize>
-              <Width>300</Width>
+              <Width>400</Width>
               <Height>200</Height>
             </MaxSize>
           </Geometry>
