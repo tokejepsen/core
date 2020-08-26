@@ -114,6 +114,8 @@ def _install_menu():
         libraryloader
     )
 
+    import mayalookassigner
+
     from . import interactive
 
     _uninstall_menu()
@@ -161,6 +163,9 @@ def _install_menu():
         )
 
         cmds.menuItem(divider=True)
+
+        cmds.menuItem("Look Manager",
+                      command=lambda *args: mayalookassigner.show())
 
         cmds.menuItem("Work Files", command=launch_workfiles_app)
 
@@ -240,6 +245,7 @@ def reload_pipeline(*args):
                    # "avalon.tools.projectmanager.widget",
                    # "avalon.tools.projectmanager.app",
 
+                   "mayalookassigner",
                    "avalon.api",
                    "avalon.tools",
                    "avalon.maya"):
