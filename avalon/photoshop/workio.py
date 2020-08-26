@@ -25,7 +25,7 @@ def has_unsaved_changes():
 
 
 def save_file(filepath):
-    lib.stub().saveAs(filepath, 'psd')
+    lib.stub().saveAs(filepath, 'psd', True)
 
 
 def open_file(filepath):
