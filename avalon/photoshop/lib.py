@@ -94,7 +94,7 @@ def launch(application):
     while True:
         if process.poll() is not None:
             print("Photoshop process is not alive. Exiting")
-            websocket_server.close()
+            websocket_server.stop()
             sys.exit(1)
         try:
             _stub = photoshop.stub()
@@ -104,9 +104,11 @@ def launch(application):
             time.sleep(0.5)
 
     # Wait for application launch to show Workfiles.
-    if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", False):
-        # Wait for Photoshop launch.
-        workfiles.show(save=False)
+    if os.environ.get("AVALON_PHOTOSHOP_WORKFILES_ON_LAUNCH", True):
+        if os.getenv("WORKFILES_SAVE_AS"):
+            workfiles.show(save=False)
+        else:
+            workfiles.show()
 
     # Wait for Photoshop launch.
     if photoshop.stub():

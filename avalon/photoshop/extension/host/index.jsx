@@ -5,6 +5,10 @@ var LogFactory=function(file,write,store,level,defaultStatus,continuing){if(file
 
 var log = new LogFactory('myLog.log'); // =>; creates the new log factory
 
+function getEnv(variable){
+    return $.getenv(variable);
+}
+
 function fileOpen(path){
     return app.open(new File(path));
 }
@@ -351,7 +355,7 @@ function _undo() {
 
 
 // triggers when panel is opened, good for debugging
-//log(isSaved());   
+//log(isSaved()); 
 //log.show();
 
 
