@@ -23,9 +23,16 @@ def execute_in_main_thread(func_to_call_from_main_thread):
     self.callback_queue.put(func_to_call_from_main_thread)
 
 
-def main_thread_listen():
-    callback = self.callback_queue.get()
-    callback()
+def main_thread_listen(process, websocket_server):
+    if process.poll() is not None: # check if PS still running
+        websocket_server.stop()
+        sys.exit(1)
+    try:
+        # get is blocking, wait for 2sec to give poll() chance to close
+        callback = self.callback_queue.get(True, 2)
+        callback()
+    except queue.Empty:
+        pass
 
 
 def show(module_name):
@@ -110,17 +117,21 @@ def launch(application):
         else:
             workfiles.show()
 
-    # Wait for Photoshop launch.
-    if photoshop.stub():
-        api.emit("application.launched")
+    # Photoshop could be closed immediately, withou workfile selection
+    try:
+        if photoshop.stub():
+            api.emit("application.launched")
 
-    self.callback_queue = queue.Queue()
-    while True:
-        main_thread_listen()
+        self.callback_queue = queue.Queue()
+        while True:
+            main_thread_listen(process, websocket_server)
 
-    # Wait on Photoshop to close before closing the websocket server
-    process.wait()
-    websocket_server.stop()
+    except ConnectionNotEstablishedYet:
+        pass
+    finally:
+        # Wait on Photoshop to close before closing the websocket server
+        process.wait()
+        websocket_server.stop()
 
 
 @contextlib.contextmanager

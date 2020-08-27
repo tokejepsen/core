@@ -31,6 +31,9 @@ def ls():
         print("Not connected yet, ignoring")
         return
 
+    if not stub.get_active_document_name():
+        return
+
     for layer in stub.get_layers():
         data = stub.read(layer)
 

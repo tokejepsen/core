@@ -55,6 +55,9 @@ function getLayers() {
      *      type:   string - type of layer guessed from its name
      *      visible:boolean - true if visible
      **/
+    if (documents.length == 0){
+        return '[]';
+    }
     var ref1 = new ActionReference();
     ref1.putEnumerated(charIDToTypeID('Dcmn'), charIDToTypeID('Ordn'), 
                        charIDToTypeID('Trgt'));
@@ -116,6 +119,9 @@ function getHeadline(){
      *  Returns headline of current document with metadata 
      * 
      **/
+    if (documents.length == 0){
+        return '';
+    }
     var headline = app.activeDocument.info.headline;
     
     return headline;
@@ -168,6 +174,9 @@ function getActiveDocumentName(){
     /**
      *   Returns file name of active document
      * */
+    if (documents.length == 0){
+        return null;
+    }
     return app.activeDocument.name;
 }
 
@@ -176,6 +185,9 @@ function getActiveDocumentFullName(){
      *   Returns file name of active document with file path.
      *   activeDocument.fullName returns path in URI (eg /c/.. insted of c:/)
      * */
+    if (documents.length == 0){
+        return null;
+    }
     var f = new File(app.activeDocument.fullName);
     var path = f.fsName;
     f.close();
@@ -355,7 +367,7 @@ function _undo() {
 
 
 // triggers when panel is opened, good for debugging
-//log(isSaved()); 
+//log(getActiveDocumentName()); 
 //log.show();
 
 
