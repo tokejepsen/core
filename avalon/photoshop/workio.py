@@ -36,8 +36,8 @@ def open_file(filepath):
 
 def current_file():
     try:
-        return os.path.normpath(lib.stub().get_active_document_full_name())\
-                                .replace("\\", "/")
+        return os.path.normpath(lib.stub().get_active_document_full_name()).\
+                                replace("\\", "/")
     except Exception:
         return None
 

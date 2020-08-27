@@ -31,10 +31,10 @@
     startUp("WEBSOCKET_URL");
 
     // get websocket server url from environment value
-    async function startUp(url) { // (1)
+    async function startUp(url){
         promis = runEvalScript("getEnv('" + url + "')");
         
-        var res = await promis; // (2)
+        var res = await promis; 
         // run rest only after resolved promise
         main(res);
     }
@@ -91,8 +91,8 @@
       
       RPC.addRoute('Photoshop.set_visible', function (data) {
               log.warn('Server called client route "set_visible":', data);
-              return runEvalScript("setVisible(" + data.layer_id + ", " 
-                                   + data.visibility + ")")
+              return runEvalScript("setVisible(" + data.layer_id + ", " +
+                                   data.visibility + ")")
                   .then(function(result){
                       log.warn("setVisible: " + result);
                       return result;

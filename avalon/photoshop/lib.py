@@ -24,7 +24,7 @@ def execute_in_main_thread(func_to_call_from_main_thread):
 
 
 def main_thread_listen(process, websocket_server):
-    if process.poll() is not None: # check if PS still running
+    if process.poll() is not None:  # check if PS still running
         websocket_server.stop()
         sys.exit(1)
     try:
