@@ -1824,15 +1824,34 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
         kwargs["flags"] = re.IGNORECASE
 
     # Get highest version among existing matching files
-    output_filename = None
     version = None
+    output_filenames = []
     for filename in sorted(filenames):
         match = re.match(file_template, filename, **kwargs)
-        if match:
-            file_version = int(match.group(1))
-            if version is None or file_version >= version:
-                version = file_version
-                output_filename = filename
+        if not match:
+            continue
+
+        file_version = int(match.group(1))
+        if version is None or file_version > version:
+            output_filenames.clear()
+            version = file_version
+
+        if file_version == version:
+            output_filenames.append(filename)
+
+    output_filename = None
+    if output_filenames:
+        if len(output_filenames) == 1:
+            output_filename = output_filenames[0]
+        else:
+            last_time = None
+            for _output_filename in output_filenames:
+                full_path = os.path.join(workdir, _output_filename)
+                mod_time = os.path.getmtime(full_path)
+                if last_time is None or last_time < mod_time:
+                    output_filename = _output_filename
+                    last_time = mod_time
+
     return output_filename, version
 
 
