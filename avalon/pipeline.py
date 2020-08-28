@@ -1794,14 +1794,6 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
 
     # Build template without optionals, version to digits only regex
     # and comment to any definable value.
-    file_template = re.sub("<.*?>", ".*?", file_template)
-    file_template = re.sub("{version.*}", "([0-9]+)", file_template)
-    file_template = re.sub("{comment.*?}", ".+?", file_template)
-    partially_filled = format_template_with_optional_keys(
-        fill_data,
-        file_template
-    )
-
     _ext = []
     for ext in extensions:
         if not ext.startswith("."):
@@ -1809,10 +1801,19 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
         # Escape dot for regex
         ext = "\\" + ext
         _ext.append(ext)
+    ext_expression = "(?:" + "|".join(_ext) + ")"
 
-    # Add or regex expression for extensions
-    partially_filled += "(?:" + "|".join(_ext) + ")"
-    file_template = "^" + partially_filled + "$"
+    # Replace `.{ext}` with `{ext}` so we are sure there is not dot at the end
+    file_template = re.sub(r"\.?{ext}", ext_expression, file_template)
+    # Replace optional keys with optional content regex
+    file_template = re.sub(r"<.*?>", r".*?", file_template)
+    # Replace `{version}` with group regex
+    file_template = re.sub(r"{version.*?}", r"([0-9]+)", file_template)
+    file_template = re.sub(r"{comment.*?}", r".+?", file_template)
+    file_template = format_template_with_optional_keys(
+        fill_data,
+        file_template
+    )
 
     # Match with ignore case on Windows due to the Windows
     # OS not being case-sensitive. This avoids later running
