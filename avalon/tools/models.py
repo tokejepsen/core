@@ -334,8 +334,11 @@ class AssetModel(TreeModel):
     ObjectIdRole = QtCore.Qt.UserRole + 3
     subsetColorsRole = QtCore.Qt.UserRole + 4
 
-    def __init__(self, parent=None):
+    def __init__(self, dbcon=None, parent=None):
         super(AssetModel, self).__init__(parent=parent)
+        if dbcon is None:
+            dbcon = io
+        self.dbcon = dbcon
         self.asset_colors = {}
         self.refresh()
 
@@ -404,11 +407,14 @@ class AssetModel(TreeModel):
         """Refresh the data for the model."""
 
         self.clear()
+        if not self.dbcon.Session.get("AVALON_PROJECT"):
+            return
+
         self.beginResetModel()
 
         # Get all assets sorted by name
-        db_assets = io.find({"type": "asset"}).sort("name", 1)
-        project_doc = io.find_one({"type": "project"})
+        db_assets = self.dbcon.find({"type": "asset"}).sort("name", 1)
+        project_doc = self.dbcon.find_one({"type": "project"})
 
         silos = None
         if lib.project_use_silo(project_doc):

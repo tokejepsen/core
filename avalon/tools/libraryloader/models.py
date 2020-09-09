@@ -102,59 +102,6 @@ class TasksModel(tools_models.TasksModel):
         self.endResetModel()
 
 
-class AssetModel(tools_models.AssetModel):
-    """A model listing assets in the silo in the active project.
-
-    The assets are displayed in a treeview, they are visually parented by
-    a `visualParent` field in the database containing an `_id` to a parent
-    asset.
-
-    """
-
-    def __init__(self, dbcon, parent=None):
-        self.dbcon = dbcon
-        super(AssetModel, self).__init__(parent=parent)
-
-    def refresh(self):
-        """Refresh the data for the model."""
-
-        self.clear()
-        if (
-            self.dbcon.active_project() is None or
-            self.dbcon.active_project() == ""
-        ):
-            return
-
-        self.beginResetModel()
-
-        db_assets = []
-        silos = None
-
-        # Get all assets sorted by name
-        db_assets = self.dbcon.find({"type": "asset"}).sort("name", 1)
-        silos = db_assets.distinct("silo") or None
-        if silos and None in silos:
-            silos = None
-
-        # Group the assets by their visual parent's id
-        assets_by_parent = collections.defaultdict(list)
-        for asset in db_assets:
-            parent_id = (
-                asset.get("data", {}).get("visualParent") or
-                asset.get("silo")
-            )
-            assets_by_parent[parent_id].append(asset)
-
-        # Build the hierarchical tree items recursively
-        self._add_hierarchy(
-            assets_by_parent,
-            parent=None,
-            silos=silos
-        )
-
-        self.endResetModel()
-
-
 class SubsetsModel(loader_models.SubsetsModel):
 
     def __init__(self, dbcon, grouping=True, parent=None):
