@@ -28,8 +28,13 @@ class AssetWidget(QtWidgets.QWidget):
     selection_changed = QtCore.Signal()  # on view selection change
     current_changed = QtCore.Signal()    # on view current index change
 
-    def __init__(self, multiselection=False, parent=None):
+    def __init__(self, multiselection=False, dbcon=None, parent=None):
         super(AssetWidget, self).__init__(parent=parent)
+
+        if dbcon is None:
+            dbcon = io
+        self.dbcon = dbcon
+
         self.setContentsMargins(0, 0, 0, 0)
 
         layout = QtWidgets.QVBoxLayout(self)
@@ -37,7 +42,7 @@ class AssetWidget(QtWidgets.QWidget):
         layout.setSpacing(4)
 
         # Tree View
-        model = AssetModel(self)
+        model = AssetModel(dbcon=self.dbcon, parent=self)
         proxy = RecursiveSortFilterProxyModel()
         proxy.setSourceModel(model)
         proxy.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
