@@ -207,7 +207,7 @@ class Server(object):
                                                       timestamp, try_index))
                 try_index += 1
                 current_time = time.time()
-            if try_index > 4:
+            if try_index > 30:
                 break
             try:
                 result = self.queue[request["message_id"]]

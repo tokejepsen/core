@@ -5,6 +5,7 @@ import getpass
 import shutil
 import logging
 
+from ...vendor import Qt
 from ...vendor.Qt import QtWidgets, QtCore
 from ... import style, io, api, pipeline
 
@@ -563,10 +564,12 @@ class FilesWidget(QtWidgets.QWidget):
         filter = "Work File (*{0})".format(filter)
         kwargs = {
             "caption": "Work Files",
-            "directory": self.root,
-            "dir": self.root,
             "filter": filter
         }
+        if Qt.__binding__ in ("PySide", "PySide2"):
+            kwargs["dir"] = self.root
+        else:
+            kwargs["directory"] = self.root
         work_file = QtWidgets.QFileDialog.getOpenFileName(**kwargs)[0]
 
         if not work_file:
