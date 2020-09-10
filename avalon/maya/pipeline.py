@@ -162,7 +162,7 @@ def _install_menu():
             parent=self._parent)
         )
 
-        cmds.menuItem("Look Manager",
+        cmds.menuItem("Look Manager...",
                       command=lambda *args: mayalookassigner.show())
 
         cmds.menuItem(divider=True)
