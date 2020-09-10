@@ -31,6 +31,17 @@ self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
 
 
+class _ZipFile(zipfile.ZipFile):
+    """Extended check for windows invalid characters."""
+    # this is extending default zipfile table for few invalid characters
+    # that can come from Mac
+    _windows_illegal_characters = ":<>|\"?*\r\n\x00"
+    _windows_illegal_name_trans_table = str.maketrans(
+        _windows_illegal_characters,
+        "_" * len(_windows_illegal_characters)
+    )
+
+
 def execute_in_main_thread(func_to_call_from_main_thread):
     self.callback_queue.put(func_to_call_from_main_thread)
 
@@ -38,6 +49,7 @@ def execute_in_main_thread(func_to_call_from_main_thread):
 def main_thread_listen():
     callback = self.callback_queue.get()
     callback()
+
 
 def launch(application_path):
     """Setup for Harmony launch.
@@ -95,7 +107,7 @@ def launch_zip_file(filepath):
         unzip = True
 
     if unzip:
-        with zipfile.ZipFile(filepath, "r") as zip_ref:
+        with _ZipFile(filepath, "r") as zip_ref:
             zip_ref.extractall(temp_path)
 
     # Close existing scene.
@@ -150,6 +162,9 @@ def zip_and_move(source, destination):
     """
     os.chdir(os.path.dirname(source))
     shutil.make_archive(os.path.basename(source), "zip", source)
+    with _ZipFile(os.path.basename(source) + ".zip") as zr:
+        if zr.testzip() is not None:
+            raise Exception("File archive is corrupted.")
     shutil.move(os.path.basename(source) + ".zip", destination)
     self.log.debug("Saved \"{}\" to \"{}\"".format(source, destination))
 
