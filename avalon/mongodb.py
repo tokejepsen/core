@@ -22,14 +22,15 @@ def extract_port_from_url(url):
     return parsed_url.port
 
 
-def requires_install(func, obj=None):
+def requires_install(func):
+    func_obj = getattr(func, "__self__", None)
+
     @functools.wraps(func)
     def decorated(*args, **kwargs):
-        if obj is not None:
-            _obj = obj
+        if func_obj is not None:
+            _obj = func_obj
         else:
             _obj = args[0]
-
         if not _obj.is_installed():
             if _obj.auto_install:
                 _obj.install()
@@ -43,17 +44,19 @@ def requires_install(func, obj=None):
     return decorated
 
 
-def auto_reconnect(func, obj=None):
+def auto_reconnect(func):
     """Handling auto reconnect in 3 retry times"""
     retry_times = 3
     reconnect_msg = "Reconnecting..."
+    func_obj = getattr(func, "__self__", None)
 
     @functools.wraps(func)
     def decorated(*args, **kwargs):
-        if obj is not None:
-            _obj = obj
+        if func_obj is not None:
+            _obj = func_obj
         else:
             _obj = args[0]
+
         for retry in range(1, retry_times + 1):
             try:
                 return func(*args, **kwargs)
