@@ -99,15 +99,12 @@ SESSION_CONTEXT_KEYS = (
 )
 
 
-def session_data_from_environment(global_keys=True, context_keys=False):
+def session_data_from_environment(context_keys=False):
     session_data = {}
     if context_keys:
         for key in SESSION_CONTEXT_KEYS:
             value = os.environ.get(key)
             session_data[key] = value or ""
-
-    if not global_keys:
-        return session_data
 
     for key, default_value in (
         # Name of current Config

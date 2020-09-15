@@ -92,9 +92,7 @@ def _install_sentry():
 
 
 def _from_environment():
-    session = session_data_from_environment(
-        global_keys=True, context_keys=True
-    )
+    session = session_data_from_environment(context_keys=True)
 
     session["schema"] = "avalon-core:session-2.0"
     try:
