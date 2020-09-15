@@ -288,7 +288,6 @@ def imprint(node_id, data, remove=False):
         else:
             scene_data[node_id] = data
 
-
     set_scene_data(scene_data)
 
 
