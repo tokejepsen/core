@@ -361,11 +361,6 @@ class AvalonMongoDB:
 
     def uninstall(self):
         """Close any connection to the database"""
-        try:
-            self._mongo_client.close()
-        except AttributeError:
-            pass
-
         AvalonMongoConnection.uninstall(self)
         self._database = None
 
