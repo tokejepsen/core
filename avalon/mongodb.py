@@ -105,6 +105,9 @@ def session_data_from_environment(context_keys=False):
         for key in SESSION_CONTEXT_KEYS:
             value = os.environ.get(key)
             session_data[key] = value or ""
+    else:
+        for key in SESSION_CONTEXT_KEYS:
+            session_data[key] = None
 
     for key, default_value in (
         # Name of current Config
