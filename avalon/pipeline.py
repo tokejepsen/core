@@ -191,7 +191,8 @@ class Loader(list):
         representation = context['representation']
         project_doc = context.get("project")
         root = None
-        if project_doc and project_doc["name"] != Session["AVALON_PROJECT"]:
+        session_project = Session.get("AVALON_PROJECT")
+        if project_doc and project_doc["name"] != session_project:
             anatomy = Anatomy(project_doc["name"])
             root = anatomy.roots_obj
 
@@ -1833,7 +1834,7 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
 
         file_version = int(match.group(1))
         if version is None or file_version > version:
-            output_filenames.clear()
+            output_filenames[:] = []
             version = file_version
 
         if file_version == version:
