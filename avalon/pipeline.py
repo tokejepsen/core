@@ -1834,7 +1834,7 @@ def last_workfile_with_version(workdir, file_template, fill_data, extensions):
 
         file_version = int(match.group(1))
         if version is None or file_version > version:
-            output_filenames.clear()
+            output_filenames[:] = []
             version = file_version
 
         if file_version == version:
