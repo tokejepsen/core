@@ -3,7 +3,7 @@ import logging
 import inspect
 
 from ...vendor import qtawesome, Qt
-from ...vendor.Qt import QtWidgets, QtCore
+from ...vendor.Qt import QtWidgets, QtCore, QtGui
 from ... import api, pipeline
 from . import lib
 from .. import lib as tools_lib
