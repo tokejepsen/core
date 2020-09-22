@@ -118,7 +118,7 @@ function Client()
   self.waitForLock = function() {
     if (self.lock == 0) {
       self.log_debug("Unlocked ...");
-      return
+      return;
     } else {
       setTimeout(self.waitForLock, 300);
     }
