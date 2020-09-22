@@ -130,7 +130,7 @@ def launch_zip_file(filepath):
     # find any xstage files is directory, prefer the one with the same name
     # as directory (plus extension)
     xstage_files = []
-    for root, _, files in os.walk(temp_path):
+    for _, _, files in os.walk(temp_path):
         for file in files:
             if os.path.splitext(file)[1] == ".xstage":
                 xstage_files.append(file)
@@ -150,12 +150,10 @@ def launch_zip_file(filepath):
     zip_based_name = "{}.xstage".format(
         os.path.splitext(os.path.basename(filepath))[0])
 
-    for xstage in xstage_files:
-        if zip_based_name in xstage_files:
-            scene_path = os.path.join(
-                temp_path, zip_based_name
-            )
-            break
+    if zip_based_name in xstage_files:
+        scene_path = os.path.join(
+            temp_path, zip_based_name
+        )
 
     if not os.path.exists(scene_path):
         print("error: cannot determine scene file")
