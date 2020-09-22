@@ -3,6 +3,7 @@ function Client()
   var self = this;
   self.socket = new QTcpSocket(this);
   self.received = "";
+  self.lock = 0;
 
   self.log_debug = function(data)
   {
@@ -63,6 +64,8 @@ function Client()
   self.on_ready_read = function()
   {
     self.log_debug("Receiving data...");
+    self.log_debug("Locking ...");
+    self.lock = 1;
     data = self.socket.readAll();
 
     if (data.size() != 0)
@@ -87,6 +90,8 @@ function Client()
     }
 
     self.received = "";
+    self.log_debug("Unlocking ...");
+    self.lock = 0;
   };
 
   self.on_connected = function()
@@ -109,8 +114,23 @@ function Client()
     self.socket.write(codec.fromUnicode(message));
   };
 
+
+  self.waitForLock = function() {
+    if (self.lock == 0) {
+      self.log_debug("Unlocked ...");
+      return
+    } else {
+      setTimeout(self.waitForLock, 300);
+    }
+  };
+
   self.send = function(request, wait)
   {
+    if (self.locked !== 0) {
+      self.log_debug("Still locked, waiting for unlock ...");
+      self.waitForLock();
+    }
+
     self._send(JSON.stringify(request));
 
     while (wait)
