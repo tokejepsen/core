@@ -5,6 +5,9 @@ import shutil
 from . import lib
 from avalon import api
 
+# used to lock saving until previous save is done.
+save_disabled = False
+
 
 def file_extensions():
     return api.HOST_WORKFILE_EXTENSIONS["harmony"]
@@ -18,6 +21,15 @@ def has_unsaved_changes():
 
 
 def save_file(filepath):
+    global save_disabled
+    if save_disabled:
+        return lib.server.send(
+            {
+                "function": "show_message",
+                "args": "Saving in progress, please wait until it finishes."
+            })["result"]
+
+    save_disabled = True
     temp_path = lib.get_local_harmony_path(filepath)
 
     if os.path.exists(temp_path):
@@ -45,6 +57,7 @@ def save_file(filepath):
     lib.server.send(
         {"function": func, "args": [scene_path]}
     )
+    save_disabled = False
 
 
 def open_file(filepath):
