@@ -359,8 +359,6 @@ class SubsetWidget(loader_widgets.SubsetWidget):
 
             except Exception as exc:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
-                traceback_msg = traceback.extract_tb(exc_traceback)[-1]
-
                 formatted_traceback = "".join(traceback.format_exception(
                     exc_type, exc_value, exc_traceback
                 ))
