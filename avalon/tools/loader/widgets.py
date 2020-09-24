@@ -49,7 +49,7 @@ class LoadErrorMessageBox(QtWidgets.QDialog):
             line = self._create_line()
             body_layout.addWidget(line)
 
-            item_name = item_name_template.format(repre, subset, version)
+            item_name = item_name_template.format(subset, version, repre)
             item_name_widget = QtWidgets.QLabel(
                 item_name.replace("\n", "<br>"), self
             )
