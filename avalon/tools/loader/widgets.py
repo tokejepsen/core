@@ -1,7 +1,9 @@
 import os
+import sys
 import datetime
 import pprint
 import inspect
+import traceback
 
 from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
 from ...vendor import qtawesome
@@ -413,6 +415,7 @@ class SubsetWidget(QtWidgets.QWidget):
         # same representation available
 
         # Trigger
+        error_info = []
         for item in items:
             version_id = item["version_document"]["_id"]
             representation = io.find_one({
@@ -427,13 +430,40 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
 
             try:
-                api.load(Loader=loader,
-                         representation=representation,
-                         options=options)
+                api.load(
+                    Loader=loader,
+                    representation=representation,
+                    options=options
+                )
 
             except pipeline.IncompatibleLoaderError as exc:
                 self.echo(exc)
-                continue
+                error_info.append((
+                    "Incompatible Loader",
+                    None,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+            except Exception as exc:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                traceback_msg = traceback.extract_tb(exc_traceback)[-1]
+
+                formatted_traceback = "".join(traceback.format_exception(
+                    exc_type, exc_value, exc_traceback
+                ))
+                error_info.append((
+                    str(exc),
+                    formatted_traceback,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+        if error_info:
+            box = LoadErrorMessageBox(error_info)
+            box.show()
 
     def selected_subsets(self, _groups=False, _merged=False, _other=True):
         selection = self.view.selectionModel()
