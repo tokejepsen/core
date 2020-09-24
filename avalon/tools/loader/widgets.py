@@ -22,6 +22,69 @@ from .model import (
 )
 
 
+class LoadErrorMessageBox(QtWidgets.QDialog):
+    def __init__(self, messages, parent=None):
+        super(LoadErrorMessageBox, self).__init__(parent)
+        self.setWindowTitle("Loading failed")
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+        body_layout = QtWidgets.QVBoxLayout(self)
+
+        main_label = (
+            "<span style='font-size:18pt;'>Failed to load items</span>"
+        )
+        main_label_widget = QtWidgets.QLabel(main_label, self)
+        body_layout.addWidget(main_label_widget)
+
+        item_name_template = (
+            "<span style='font-weight:bold;'>Subset:</span> {}<br>"
+            "<span style='font-weight:bold;'>Version:</span> {}<br>"
+            "<span style='font-weight:bold;'>Representation:</span> {}<br>"
+        )
+        exc_msg_template = "<span style='font-weight:bold'>{}</span>"
+
+        for exc_msg, tb, repre, subset, version in messages:
+            line = self._create_line()
+            body_layout.addWidget(line)
+
+            item_name = item_name_template.format(repre, subset, version)
+            item_name_widget = QtWidgets.QLabel(
+                item_name.replace("\n", "<br>"), self
+            )
+            body_layout.addWidget(item_name_widget)
+
+            exc_msg = exc_msg_template.format(exc_msg.replace("\n", "<br>"))
+            message_label_widget = QtWidgets.QLabel(exc_msg, self)
+            body_layout.addWidget(message_label_widget)
+
+            if tb:
+                tb_widget = QtWidgets.QLabel(tb.replace("\n", "<br>"), self)
+                tb_widget.setTextInteractionFlags(
+                    QtCore.Qt.TextBrowserInteraction
+                )
+                body_layout.addWidget(tb_widget)
+
+        footer_widget = QtWidgets.QWidget(self)
+        footer_layout = QtWidgets.QHBoxLayout(footer_widget)
+        buttonBox = QtWidgets.QDialogButtonBox(QtCore.Qt.Vertical)
+        buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+        )
+        buttonBox.accepted.connect(self._on_accept)
+        footer_layout.addWidget(buttonBox, alignment=QtCore.Qt.AlignRight)
+        body_layout.addWidget(footer_widget)
+
+    def _on_accept(self):
+        self.close()
+
+    def _create_line(self):
+        line = QtWidgets.QFrame(self)
+        line.setFixedHeight(2)
+        line.setFrameShape(QtWidgets.QFrame.HLine)
+        line.setFrameShadow(QtWidgets.QFrame.Sunken)
+        return line
+
+
 class SubsetWidget(QtWidgets.QWidget):
     """A widget that lists the published subsets for an asset"""
 
