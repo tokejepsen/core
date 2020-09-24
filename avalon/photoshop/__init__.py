@@ -22,11 +22,22 @@ from .workio import (
 
 from .lib import (
     launch,
-    stub,
+    app,
+    Dispatch,
     maintained_selection,
     maintained_visibility,
+    get_layers_in_document,
+    get_layers_in_layers,
+    get_selected_layers,
+    group_selected_layers,
+    imprint,
+    read,
+    get_com_objects,
+    import_smart_object,
+    replace_smart_object,
     show,
-    execute_in_main_thread
+    execute_in_main_thread,
+    select_layers
 )
 
 __all__ = [
@@ -46,9 +57,20 @@ __all__ = [
 
     # lib
     "launch",
-    "stub",
+    "app",
+    "Dispatch",
     "maintained_selection",
     "maintained_visibility",
+    "get_layers_in_document",
+    "get_layers_in_layers",
+    "get_selected_layers",
+    "group_selected_layers",
+    "imprint",
+    "read",
+    "get_com_objects",
+    "import_smart_object",
+    "replace_smart_object",
     "show",
-    "execute_in_main_thread"
+    "execute_in_main_thread",
+    "select_layers"
 ]
