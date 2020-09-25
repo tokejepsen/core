@@ -216,13 +216,13 @@ class TasksModel(TreeModel):
     def _get_task_icons(self):
         # Get the project configured icons from database
         project = io.find_one({"type": "project"})
-        tasks = project["config"].get("tasks", [])
-        for task in tasks:
+        tasks = project["config"].get("tasks", {})
+        for task_name, task in tasks.items():
             icon_name = task.get("icon", None)
             if icon_name:
                 icon = qtawesome.icon("fa.{}".format(icon_name),
                                       color=style.colors.default)
-                self._icons[task["name"]] = icon
+                self._icons[task_name] = icon
 
     def set_assets(self, asset_ids=None, asset_docs=None):
         """Set assets to track by their database id
@@ -257,8 +257,8 @@ class TasksModel(TreeModel):
 
         tasks = collections.Counter()
         for asset_doc in asset_docs:
-            asset_tasks = asset_doc.get("data", {}).get("tasks", [])
-            tasks.update(asset_tasks)
+            asset_tasks = asset_doc.get("data", {}).get("tasks", {})
+            tasks.update(asset_tasks.keys())
 
         self.clear()
         self.beginResetModel()
