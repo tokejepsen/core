@@ -75,6 +75,15 @@ def launch(application_path):
     # No launch through Workfiles happened.
     if not self.workfile_path:
         zip_file = os.path.join(os.path.dirname(__file__), "temp.zip")
+        temp_path = get_local_harmony_path(zip_file)
+        if os.path.exists(temp_path):
+            self.log.info(f"removing existing {temp_path}")
+            try:
+                shutil.rmtree(temp_path)
+            except Exception as e:
+                self.log.critical(f"cannot clear {temp_path}")
+                raise Exception(f"cannot clear {temp_path}") from e
+
         launch_zip_file(zip_file)
 
     self.callback_queue = queue.Queue()
