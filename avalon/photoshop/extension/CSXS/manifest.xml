@@ -20,26 +20,20 @@
       <DispatchInfo>
         <Resources>
           <MainPath>./index.html</MainPath>
-          <CEFCommandLine />
         </Resources>
         <Lifecycle>
-		  <AutoVisible>true</AutoVisible>
-          <StartOn>
-            <!-- Photoshop dispatches this event on startup -->
-            <Event>applicationActivate</Event>
-            <Event>com.adobe.csxs.events.ApplicationInitialized</Event>
-          </StartOn>
-		</Lifecycle>
+					<AutoVisible>true</AutoVisible>
+				</Lifecycle>
         <UI>
           <Type>Panel</Type>
           <Menu>Avalon</Menu>
           <Geometry>
             <Size>
-              <Width>300</Width>
-              <Height>140</Height>
+              <Width>150</Width>
+              <Height>100</Height>
             </Size>
             <MaxSize>
-              <Width>400</Width>
+              <Width>300</Width>
               <Height>200</Height>
             </MaxSize>
           </Geometry>

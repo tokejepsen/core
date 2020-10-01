@@ -6,11 +6,10 @@ from avalon import api
 
 
 def _active_document():
-    document_name = lib.stub().get_active_document_name()
-    if not document_name:
+    if len(lib.app().Documents) < 1:
         return None
 
-    return document_name
+    return lib.app().ActiveDocument
 
 
 def file_extensions():
@@ -19,25 +18,24 @@ def file_extensions():
 
 def has_unsaved_changes():
     if _active_document():
-        return not lib.stub().is_saved()
+        return not _active_document().Saved
 
     return False
 
 
 def save_file(filepath):
-    lib.stub().saveAs(filepath, 'psd', True)
+    _active_document().SaveAs(filepath)
 
 
 def open_file(filepath):
-    lib.stub().open(filepath)
+    lib.app().Open(filepath)
 
     return True
 
 
 def current_file():
     try:
-        return os.path.normpath(lib.stub().get_active_document_full_name()).\
-                                replace("\\", "/")
+        return os.path.normpath(_active_document().FullName).replace("\\", "/")
     except Exception:
         return None
 
