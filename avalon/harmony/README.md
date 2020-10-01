@@ -51,12 +51,15 @@ You can show the Workfiles app when Harmony launches by setting environment vari
 To send from Python to Harmony you can use the exposed method:
 ```python
 from avalon import harmony
-func = """function hello(person)
+from uuid import uuid4
+
+
+func = """function %s_hello(person)
 {
   return ("Hello " + person + "!");
 }
-hello
-"""
+%s_hello
+""" % (uuid4(), uuid4())
 print(harmony.send({"function": func, "args": ["Python"]})["result"])
 ```
 NOTE: Its important to declare the function at the end of the function string. You can have multiple functions within your function string, but the function declared at the end is what gets executed.
@@ -64,16 +67,27 @@ NOTE: Its important to declare the function at the end of the function string. Y
 To send a function with multiple arguments its best to declare the arguments within the function:
 ```python
 from avalon import harmony
-func = """function hello(args)
+from uuid import uuid4
+
+
+func = """function %s_hello(args)
 {
   var greeting = args[0];
   var person = args[1];
   return (greeting + " " + person + "!");
 }
-hello
-"""
+%s_hello
+""" % (uuid4(), uuid4())
 print(harmony.send({"function": func, "args": ["Hello", "Python"]})["result"])
 ```
+
+### Caution
+
+When naming your functions be aware that they are executed in global scope. They can potentially clash with Harmony own function and object names.
+For example `func` is already existing Harmony object. When you call your function `func` it will overwrite in global scope the one from Harmony, causing
+erratic behavior of Harmony. Avalon is prefixing those function names with [UUID4](https://docs.python.org/3/library/uuid.html) making chance of such clash minimal.
+See above examples how that works. This will result in function named `38dfcef0-a6d7-4064-8069-51fe99ab276e_hello()`.
+You can find list of Harmony object and function in Harmony documentation.
 
 ### Scene Save
 Instead of sending a request to Harmony with `scene.saveAll` please use:
@@ -96,6 +110,7 @@ These plugins were made with the [polly config](https://github.com/mindbender-st
 #### Creator Plugin
 ```python
 from avalon import harmony
+from uuid import uuid4
 
 
 class CreateComposite(harmony.Creator):
@@ -126,12 +141,12 @@ class CreateRender(harmony.Creator):
         super(CreateRender, self).__init__(*args, **kwargs)
 
     def setup_node(self, node):
-        func = """function func(args)
+        func = """function %s_func(args)
         {
             node.setTextAttr(args[0], "DRAWING_TYPE", 1, "PNG4");
         }
-        func
-        """
+        %s_func
+        """ % (uuid4(), uuid4())
         harmony.send(
             {"function": func, "args": [node]}
         )
@@ -212,7 +227,7 @@ class ExtractImage(pyblish.api.InstancePlugin):
 
         # Store display source node for later.
         display_node = "Top/Display"
-        func = """function func(display_node)
+        func = """function %s_func(display_node)
         {
             var source_node = null;
             if (node.isLinked(display_node, 0))
@@ -222,8 +237,8 @@ class ExtractImage(pyblish.api.InstancePlugin):
             }
             return source_node
         }
-        func
-        """
+        %s_func
+        """ % (uuid4(), uuid4())
         display_source_node = harmony.send(
             {"function": func, "args": [display_node]}
         )["result"]
@@ -243,7 +258,7 @@ class ExtractImage(pyblish.api.InstancePlugin):
           var path = "{path}/{filename}" + frame + ".png";
           celImage.imageFileAs(path, "", "PNG4");
         }}
-        function func(composite_node)
+        function %s_func(composite_node)
         {{
             node.link(composite_node, 0, "{display_node}", 0);
             render.frameReady.connect(frameReady);
@@ -251,9 +266,9 @@ class ExtractImage(pyblish.api.InstancePlugin):
             render.renderSceneAll();
             render.frameReady.disconnect(frameReady);
         }}
-        func
-        """
-        restore_func = """function func(args)
+        %s_func
+        """ % (uuid4(), uuid4())
+        restore_func = """function %s_func(args)
         {
             var display_node = args[0];
             var display_source_node = args[1];
@@ -263,8 +278,8 @@ class ExtractImage(pyblish.api.InstancePlugin):
             }
             node.link(display_source_node, 0, display_node, 0);
         }
-        func
-        """
+        %s_func
+        """ % (uuid4(), uuid4())
 
         with harmony.maintained_selection():
             self.log.info("Extracting %s" % str(list(instance)))
@@ -326,113 +341,117 @@ copy_files = """function copyFile(srcFilename, dstFilename)
 }
 """
 
-import_files = """var PNGTransparencyMode = 0; //Premultiplied wih Black
-var TGATransparencyMode = 0; //Premultiplied wih Black
-var SGITransparencyMode = 0; //Premultiplied wih Black
-var LayeredPSDTransparencyMode = 1; //Straight
-var FlatPSDTransparencyMode = 2; //Premultiplied wih White
-
-function getUniqueColumnName( column_prefix )
+import_files = """function %s_import_files()
 {
-    var suffix = 0;
-    // finds if unique name for a column
-    var column_name = column_prefix;
-    while(suffix < 2000)
-    {
-        if(!column.type(column_name))
-        break;
+  var PNGTransparencyMode = 0;  // Premultiplied wih Black
+  var TGATransparencyMode = 0;  // Premultiplied wih Black
+  var SGITransparencyMode = 0;  // Premultiplied wih Black
+  var LayeredPSDTransparencyMode = 1;  // Straight
+  var FlatPSDTransparencyMode = 2;  // Premultiplied wih White
 
-        suffix = suffix + 1;
-        column_name = column_prefix + "_" + suffix;
-    }
-    return column_name;
+  function getUniqueColumnName( column_prefix )
+  {
+      var suffix = 0;
+      // finds if unique name for a column
+      var column_name = column_prefix;
+      while(suffix < 2000)
+      {
+          if(!column.type(column_name))
+          break;
+
+          suffix = suffix + 1;
+          column_name = column_prefix + "_" + suffix;
+      }
+      return column_name;
+  }
+
+  function import_files(args)
+  {
+      var root = args[0];
+      var files = args[1];
+      var name = args[2];
+      var start_frame = args[3];
+
+      var vectorFormat = null;
+      var extension = null;
+      var filename = files[0];
+
+      var pos = filename.lastIndexOf(".");
+      if( pos < 0 )
+          return null;
+
+      extension = filename.substr(pos+1).toLowerCase();
+
+      if(extension == "jpeg")
+          extension = "jpg";
+      if(extension == "tvg")
+      {
+          vectorFormat = "TVG"
+          extension ="SCAN"; // element.add() will use this.
+      }
+
+      var elemId = element.add(
+          name,
+          "BW",
+          scene.numberOfUnitsZ(),
+          extension.toUpperCase(),
+          vectorFormat
+      );
+      if (elemId == -1)
+      {
+          // hum, unknown file type most likely -- let's skip it.
+          return null; // no read to add.
+      }
+
+      var uniqueColumnName = getUniqueColumnName(name);
+      column.add(uniqueColumnName , "DRAWING");
+      column.setElementIdOfDrawing(uniqueColumnName, elemId);
+
+      var read = node.add(root, name, "READ", 0, 0, 0);
+      var transparencyAttr = node.getAttr(
+          read, frame.current(), "READ_TRANSPARENCY"
+      );
+      var opacityAttr = node.getAttr(read, frame.current(), "OPACITY");
+      transparencyAttr.setValue(true);
+      opacityAttr.setValue(true);
+
+      var alignmentAttr = node.getAttr(read, frame.current(), "ALIGNMENT_RULE");
+      alignmentAttr.setValue("ASIS");
+
+      var transparencyModeAttr = node.getAttr(
+          read, frame.current(), "applyMatteToColor"
+      );
+      if (extension == "png")
+          transparencyModeAttr.setValue(PNGTransparencyMode);
+      if (extension == "tga")
+          transparencyModeAttr.setValue(TGATransparencyMode);
+      if (extension == "sgi")
+          transparencyModeAttr.setValue(SGITransparencyMode);
+      if (extension == "psd")
+          transparencyModeAttr.setValue(FlatPSDTransparencyMode);
+
+      node.linkAttr(read, "DRAWING.ELEMENT", uniqueColumnName);
+
+      // Create a drawing for each file.
+      for( var i =0; i <= files.length - 1; ++i)
+      {
+          timing = start_frame + i
+          // Create a drawing drawing, 'true' indicate that the file exists.
+          Drawing.create(elemId, timing, true);
+          // Get the actual path, in tmp folder.
+          var drawingFilePath = Drawing.filename(elemId, timing.toString());
+          copyFile( files[i], drawingFilePath );
+
+          column.setEntry(uniqueColumnName, 1, timing, timing.toString());
+      }
+      return read;
+  }
+  import_files();
 }
+%s_import_files
+""" % (uuid4(), uuid4())
 
-function import_files(args)
-{
-    var root = args[0];
-    var files = args[1];
-    var name = args[2];
-    var start_frame = args[3];
-
-    var vectorFormat = null;
-    var extension = null;
-    var filename = files[0];
-
-    var pos = filename.lastIndexOf(".");
-    if( pos < 0 )
-        return null;
-
-    extension = filename.substr(pos+1).toLowerCase();
-
-    if(extension == "jpeg")
-        extension = "jpg";
-    if(extension == "tvg")
-    {
-        vectorFormat = "TVG"
-        extension ="SCAN"; // element.add() will use this.
-    }
-
-    var elemId = element.add(
-        name,
-        "BW",
-        scene.numberOfUnitsZ(),
-        extension.toUpperCase(),
-        vectorFormat
-    );
-    if (elemId == -1)
-    {
-        // hum, unknown file type most likely -- let's skip it.
-        return null; // no read to add.
-    }
-
-    var uniqueColumnName = getUniqueColumnName(name);
-    column.add(uniqueColumnName , "DRAWING");
-    column.setElementIdOfDrawing(uniqueColumnName, elemId);
-
-    var read = node.add(root, name, "READ", 0, 0, 0);
-    var transparencyAttr = node.getAttr(
-        read, frame.current(), "READ_TRANSPARENCY"
-    );
-    var opacityAttr = node.getAttr(read, frame.current(), "OPACITY");
-    transparencyAttr.setValue(true);
-    opacityAttr.setValue(true);
-
-    var alignmentAttr = node.getAttr(read, frame.current(), "ALIGNMENT_RULE");
-    alignmentAttr.setValue("ASIS");
-
-    var transparencyModeAttr = node.getAttr(
-        read, frame.current(), "applyMatteToColor"
-    );
-    if (extension == "png")
-        transparencyModeAttr.setValue(PNGTransparencyMode);
-    if (extension == "tga")
-        transparencyModeAttr.setValue(TGATransparencyMode);
-    if (extension == "sgi")
-        transparencyModeAttr.setValue(SGITransparencyMode);
-    if (extension == "psd")
-        transparencyModeAttr.setValue(FlatPSDTransparencyMode);
-
-    node.linkAttr(read, "DRAWING.ELEMENT", uniqueColumnName);
-
-    // Create a drawing for each file.
-    for( var i =0; i <= files.length - 1; ++i)
-    {
-        timing = start_frame + i
-        // Create a drawing drawing, 'true' indicate that the file exists.
-        Drawing.create(elemId, timing, true);
-        // Get the actual path, in tmp folder.
-        var drawingFilePath = Drawing.filename(elemId, timing.toString());
-        copyFile( files[i], drawingFilePath );
-
-        column.setEntry(uniqueColumnName, 1, timing, timing.toString());
-    }
-    return read;
-}
-import_files
-"""
-
-replace_files = """function replace_files(args)
+replace_files = """function %s_replace_files(args)
 {
     var files = args[0];
     var _node = args[1];
@@ -462,8 +481,8 @@ replace_files = """function replace_files(args)
         column.setEntry(_column, 1, timing, timing.toString());
     }
 }
-replace_files
-"""
+%s_replace_files
+""" % (uuid4(), uuid4())
 
 
 class ImageSequenceLoader(api.Loader):
@@ -524,12 +543,12 @@ class ImageSequenceLoader(api.Loader):
 
     def remove(self, container):
         node = container.pop("node")
-        func = """function deleteNode(_node)
+        func = """function %s_deleteNode(_node)
         {
             node.deleteNode(_node, true, true);
         }
-        deleteNode
-        """
+        %_deleteNode
+        """ % (uuid4(), uuid4())
         harmony.send(
             {"function": func, "args": [node]}
         )

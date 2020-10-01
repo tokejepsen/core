@@ -12,6 +12,7 @@ import contextlib
 import json
 import signal
 import time
+from uuid import uuid4
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
@@ -29,6 +30,8 @@ self.port = None
 # Setup logging.
 self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
+
+signature = str(uuid4())
 
 
 class _ZipFile(zipfile.ZipFile):
@@ -237,7 +240,7 @@ def show(module_name):
 
 
 def get_scene_data():
-    func = """function func(args)
+    func = """function %s_func(args)
     {
         var metadata = scene.metadata("avalon");
         if (metadata){
@@ -246,8 +249,8 @@ def get_scene_data():
             return {};
         }
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     try:
         return self.send({"function": func})["result"]
     except json.decoder.JSONDecodeError:
@@ -260,7 +263,7 @@ def get_scene_data():
 
 def set_scene_data(data):
     # Write scene data.
-    func = """function func(args)
+    func = """function %s_func(args)
     {
         scene.setMetadata({
           "name"       : "avalon",
@@ -270,8 +273,8 @@ def set_scene_data(data):
           "value"      : JSON.stringify(args[0])
         });
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func, "args": [data]})
 
 
@@ -378,19 +381,19 @@ def maintained_nodes_state(nodes):
         )
 
     # Disable all nodes.
-    func = """function func(nodes)
+    func = """function %s_func(nodes)
     {
         for (var i = 0 ; i < nodes.length; i++)
         {
             node.setEnable(nodes[i], false);
         }
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func, "args": [nodes]})
 
     # Restore state after yield.
-    func = """function func(args)
+    func = """function %s_func(args)
     {
         var nodes = args[0];
         var states = args[1];
@@ -399,8 +402,8 @@ def maintained_nodes_state(nodes):
             node.setEnable(nodes[i], states[i]);
         }
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
 
     try:
         yield
@@ -418,7 +421,7 @@ def save_scene():
     """
     # Need to turn off the backgound watcher else the communication with
     # the server gets spammed with two requests at the same time.
-    func = """function func()
+    func = """function %s_func()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = false;
@@ -428,21 +431,21 @@ def save_scene():
             scene.currentVersionName() + ".xstage"
         );
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     scene_path = self.send({"function": func})["result"]
 
     # Manually update the remote file.
     self.on_file_changed(scene_path, threaded=False)
 
     # Re-enable the background watcher.
-    func = """function func()
+    func = """function %s_func()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = true;
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func})
 
 
