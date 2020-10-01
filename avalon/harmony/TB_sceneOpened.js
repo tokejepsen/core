@@ -98,6 +98,16 @@ function Client()
   {
     self.log_debug("Connected to server.");
     self.socket.readyRead.connect(self.on_ready_read);
+
+    var app = QCoreApplication.instance();
+    app.avalon_client.send(
+      {
+        "module": "avalon.api",
+        "method": "emit",
+        "args": ["application.launched"]
+      },
+      false
+    );
   };
 
   self._send = function(message)
@@ -294,14 +304,6 @@ function start()
 	app.watcher.fileChanged.connect(app.on_file_changed);
   app.avalon_on_file_changed = true;
   */
-  app.avalon_client.send(
-    {
-      "module": "avalon.api",
-      "method": "emit",
-      "args": ["application.launched"]
-    },
-    false
-  );
 }
 
 function TB_sceneOpened()
