@@ -1,3 +1,5 @@
+import sys
+import traceback
 import datetime
 import logging
 import inspect
@@ -323,6 +325,7 @@ class SubsetWidget(loader_widgets.SubsetWidget):
         # same representation available
 
         # Trigger
+        error_info = []
         for item in items:
             version_id = item["version_document"]["_id"]
             representation = self.dbcon.find_one({
@@ -346,7 +349,30 @@ class SubsetWidget(loader_widgets.SubsetWidget):
 
             except pipeline.IncompatibleLoaderError as exc:
                 self.echo(exc)
-                continue
+                error_info.append((
+                    "Incompatible Loader",
+                    None,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+            except Exception as exc:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                formatted_traceback = "".join(traceback.format_exception(
+                    exc_type, exc_value, exc_traceback
+                ))
+                error_info.append((
+                    str(exc),
+                    formatted_traceback,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+        if error_info:
+            box = loader_widgets.LoadErrorMessageBox(error_info)
+            box.show()
 
     def group_subsets(self, name, asset_id, items):
         field = "data.subsetGroup"

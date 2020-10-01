@@ -1,7 +1,9 @@
 import os
+import sys
 import datetime
 import pprint
 import inspect
+import traceback
 
 from ...vendor.Qt import QtWidgets, QtCore, QtGui, QtSvg
 from ...vendor import qtawesome
@@ -20,6 +22,69 @@ from .model import (
     SubsetFilterProxyModel,
     FamiliesFilterProxyModel,
 )
+
+
+class LoadErrorMessageBox(QtWidgets.QDialog):
+    def __init__(self, messages, parent=None):
+        super(LoadErrorMessageBox, self).__init__(parent)
+        self.setWindowTitle("Loading failed")
+        self.setFocusPolicy(QtCore.Qt.StrongFocus)
+
+        body_layout = QtWidgets.QVBoxLayout(self)
+
+        main_label = (
+            "<span style='font-size:18pt;'>Failed to load items</span>"
+        )
+        main_label_widget = QtWidgets.QLabel(main_label, self)
+        body_layout.addWidget(main_label_widget)
+
+        item_name_template = (
+            "<span style='font-weight:bold;'>Subset:</span> {}<br>"
+            "<span style='font-weight:bold;'>Version:</span> {}<br>"
+            "<span style='font-weight:bold;'>Representation:</span> {}<br>"
+        )
+        exc_msg_template = "<span style='font-weight:bold'>{}</span>"
+
+        for exc_msg, tb, repre, subset, version in messages:
+            line = self._create_line()
+            body_layout.addWidget(line)
+
+            item_name = item_name_template.format(subset, version, repre)
+            item_name_widget = QtWidgets.QLabel(
+                item_name.replace("\n", "<br>"), self
+            )
+            body_layout.addWidget(item_name_widget)
+
+            exc_msg = exc_msg_template.format(exc_msg.replace("\n", "<br>"))
+            message_label_widget = QtWidgets.QLabel(exc_msg, self)
+            body_layout.addWidget(message_label_widget)
+
+            if tb:
+                tb_widget = QtWidgets.QLabel(tb.replace("\n", "<br>"), self)
+                tb_widget.setTextInteractionFlags(
+                    QtCore.Qt.TextBrowserInteraction
+                )
+                body_layout.addWidget(tb_widget)
+
+        footer_widget = QtWidgets.QWidget(self)
+        footer_layout = QtWidgets.QHBoxLayout(footer_widget)
+        buttonBox = QtWidgets.QDialogButtonBox(QtCore.Qt.Vertical)
+        buttonBox.setStandardButtons(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+        )
+        buttonBox.accepted.connect(self._on_accept)
+        footer_layout.addWidget(buttonBox, alignment=QtCore.Qt.AlignRight)
+        body_layout.addWidget(footer_widget)
+
+    def _on_accept(self):
+        self.close()
+
+    def _create_line(self):
+        line = QtWidgets.QFrame(self)
+        line.setFixedHeight(2)
+        line.setFrameShape(QtWidgets.QFrame.HLine)
+        line.setFrameShadow(QtWidgets.QFrame.Sunken)
+        return line
 
 
 class SubsetWidget(QtWidgets.QWidget):
@@ -350,6 +415,7 @@ class SubsetWidget(QtWidgets.QWidget):
         # same representation available
 
         # Trigger
+        error_info = []
         for item in items:
             version_id = item["version_document"]["_id"]
             representation = io.find_one({
@@ -364,13 +430,38 @@ class SubsetWidget(QtWidgets.QWidget):
                 continue
 
             try:
-                api.load(Loader=loader,
-                         representation=representation,
-                         options=options)
+                api.load(
+                    Loader=loader,
+                    representation=representation,
+                    options=options
+                )
 
             except pipeline.IncompatibleLoaderError as exc:
                 self.echo(exc)
-                continue
+                error_info.append((
+                    "Incompatible Loader",
+                    None,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+            except Exception as exc:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                formatted_traceback = "".join(traceback.format_exception(
+                    exc_type, exc_value, exc_traceback
+                ))
+                error_info.append((
+                    str(exc),
+                    formatted_traceback,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+        if error_info:
+            box = LoadErrorMessageBox(error_info)
+            box.show()
 
     def selected_subsets(self, _groups=False, _merged=False, _other=True):
         selection = self.view.selectionModel()
