@@ -1,9 +1,11 @@
+import sys
+import traceback
 import datetime
 import logging
 import inspect
 
 from ...vendor import qtawesome, Qt
-from ...vendor.Qt import QtWidgets, QtCore
+from ...vendor.Qt import QtWidgets, QtCore, QtGui
 from ... import api, pipeline
 from . import lib
 from .. import lib as tools_lib
@@ -15,6 +17,7 @@ from .models import SubsetsModel, FamiliesFilterProxyModel
 from ..loader.model import SubsetFilterProxyModel
 from .delegates import VersionDelegate
 from ..delegates import PrettyTimeDelegate
+from ..widgets import OptionalMenu, OptionalAction, OptionDialog
 
 log = logging.getLogger(__name__)
 
@@ -230,17 +233,22 @@ class SubsetWidget(loader_widgets.SubsetWidget):
 
                 loaders.append((repre, loader))
 
-        menu = QtWidgets.QMenu(self)
+        menu = OptionalMenu(self)
         if not loaders:
             # no loaders available
+            submsg = "your selection."
             if one_item_selected:
-                self.echo("No compatible loaders available for this version.")
-                return
+                submsg = "this version."
 
-            self.echo("No compatible loaders available for your selection.")
-            action = QtWidgets.QAction(
-                "*No compatible loaders for your selection", menu
+            msg = "No compatible loaders for {}".format(submsg)
+            self.echo(msg)
+
+            icon = qtawesome.icon(
+                "fa.exclamation",
+                color=QtGui.QColor(255, 51, 0)
             )
+
+            action = OptionalAction(("*" + msg), icon, False, menu)
             menu.addAction(action)
 
         else:
@@ -258,16 +266,7 @@ class SubsetWidget(loader_widgets.SubsetWidget):
                     label = loader.__name__
 
                 # Add the representation as suffix
-                label = "{0} ({1})".format(label, representation["name"])
-
-                action = QtWidgets.QAction(label, menu)
-                action.setData((representation, loader))
-
-                # Add tooltip and statustip from Loader docstring
-                tip = inspect.getdoc(loader)
-                if tip:
-                    action.setToolTip(tip)
-                    action.setStatusTip(tip)
+                label = "{0} ({1})".format(label, representation['name'])
 
                 # Support font-awesome icons using the `.icon` and `.color`
                 # attributes on plug-ins.
@@ -276,10 +275,26 @@ class SubsetWidget(loader_widgets.SubsetWidget):
                     try:
                         key = "fa.{0}".format(icon)
                         color = getattr(loader, "color", "white")
-                        action.setIcon(qtawesome.icon(key, color=color))
+                        icon = qtawesome.icon(key, color=color)
                     except Exception as e:
                         print("Unable to set icon for loader "
                               "{}: {}".format(loader, e))
+                        icon = None
+
+                # Optional action
+                use_option = one_item_selected and hasattr(loader, "options")
+                action = OptionalAction(label, icon, use_option, menu)
+                if use_option:
+                    # Add option box tip
+                    action.set_option_tip(loader.options)
+
+                action.setData((representation, loader))
+
+                # Add tooltip and statustip from Loader docstring
+                tip = inspect.getdoc(loader)
+                if tip:
+                    action.setToolTip(tip)
+                    action.setStatusTip(tip)
 
                 menu.addAction(action)
 
@@ -292,24 +307,25 @@ class SubsetWidget(loader_widgets.SubsetWidget):
         # Find the representation name and loader to trigger
         action_representation, loader = action.data()
         representation_name = action_representation["name"]  # extension
+        options = None
+
+        # Pop option dialog
+        if getattr(action, "optioned", False):
+            dialog = OptionDialog(self)
+            dialog.setWindowTitle(action.label + " Options")
+            dialog.create(loader.options)
+
+            if not dialog.exec_():
+                return
+
+            # Get option
+            options = dialog.parse()
 
         # Run the loader for all selected indices, for those that have the
         # same representation available
-        selection = self.view.selectionModel()
-        rows = selection.selectedRows(column=0)
-
-        # Ensure active point index is also used as first column so we can
-        # correctly push it to the end in the rows list.
-        point_index = point_index.sibling(point_index.row(), 0)
-
-        # Ensure point index is run first.
-        try:
-            rows.remove(point_index)
-        except ValueError:
-            pass
-        rows.insert(0, point_index)
 
         # Trigger
+        error_info = []
         for item in items:
             version_id = item["version_document"]["_id"]
             representation = self.dbcon.find_one({
@@ -327,11 +343,36 @@ class SubsetWidget(loader_widgets.SubsetWidget):
                 lib.load(
                     dbcon=self.dbcon,
                     Loader=loader,
-                    representation=representation
+                    representation=representation,
+                    options=options
                 )
+
             except pipeline.IncompatibleLoaderError as exc:
                 self.echo(exc)
-                continue
+                error_info.append((
+                    "Incompatible Loader",
+                    None,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+            except Exception as exc:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                formatted_traceback = "".join(traceback.format_exception(
+                    exc_type, exc_value, exc_traceback
+                ))
+                error_info.append((
+                    str(exc),
+                    formatted_traceback,
+                    representation["name"],
+                    item["subset"],
+                    item["version_document"]["name"]
+                ))
+
+        if error_info:
+            box = loader_widgets.LoadErrorMessageBox(error_info)
+            box.show()
 
     def group_subsets(self, name, asset_id, items):
         field = "data.subsetGroup"

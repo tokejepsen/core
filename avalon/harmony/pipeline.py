@@ -1,8 +1,12 @@
 from .. import api, pipeline
 from . import lib
 from ..vendor import Qt
+from uuid import uuid4
 
 import pyblish.api
+
+
+signature = str(uuid4())
 
 
 def install():
@@ -49,18 +53,18 @@ class Creator(api.Creator):
     node_type = "COMPOSITE"
 
     def setup_node(self, node):
-        func = """function func(args)
+        func = """function %s_func(args)
         {
             node.setTextAttr(args[0], "COMPOSITE_MODE", 1, "Pass Through");
         }
-        func
-        """
+        %s_func
+        """ % (signature, signature)
         lib.send(
             {"function": func, "args": [node]}
         )
 
     def process(self):
-        func = """function func(args)
+        func = """function %s_func(args)
         {
             var nodes = node.getNodes([args[0]]);
             var node_names = [];
@@ -70,8 +74,8 @@ class Creator(api.Creator):
             }
             return node_names
         }
-        func
-        """
+        %s_func
+        """ % (signature, signature)
 
         existing_node_names = lib.send(
             {"function": func, "args": [self.node_type]}
@@ -87,7 +91,7 @@ class Creator(api.Creator):
                 message_box.exec_()
                 return False
 
-        func = """function func(args)
+        func = """function %s_func(args)
         {
             var result_node = node.add("Top", args[0], args[1], 0, 0, 0);
 
@@ -103,8 +107,8 @@ class Creator(api.Creator):
             }
             return result_node
         }
-        func
-        """
+        %s_func
+        """ % (signature, signature)
 
         with lib.maintained_selection() as selection:
             node = None
@@ -161,7 +165,7 @@ def containerise(name,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
         "nodes": nodes
-        }
+    }
 
     lib.imprint(node, data)
 

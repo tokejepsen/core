@@ -31,6 +31,11 @@ function Client()
       MessageLog.trace("(ERROR): " + message.toString());
   };
 
+  self.show_message = function(msg)
+  {
+    MessageBox.information(msg);
+  };
+
   self.process_request = function(request)
   {
     self.log_debug("Processing: " + JSON.stringify(request));
@@ -40,14 +45,14 @@ function Client()
     {
       try
       {
-        var func = eval(request["function"]);
+        var _func = eval.call( null, request["function"]);
 
         if (request.args == null)
         {
-          result = func();
+          result = _func();
         }else
         {
-          result = func(request.args);
+          result = _func(request.args);
         }
       }
 
@@ -93,6 +98,16 @@ function Client()
   {
     self.log_debug("Connected to server.");
     self.socket.readyRead.connect(self.on_ready_read);
+
+    var app = QCoreApplication.instance();
+    app.avalon_client.send(
+      {
+        "module": "avalon.api",
+        "method": "emit",
+        "args": ["application.launched"]
+      },
+      false
+    );
   };
 
   self._send = function(message)
@@ -260,6 +275,10 @@ function start()
     action.triggered.connect(self.on_manage);
 	}
 
+  // FIXME(antirotor): We need to disable `on_file_changed` now as is wreak
+  // havoc when "Save" is called multiple times and zipping didn't finished yet
+  /*
+
   // Watch scene file for changes.
   app.on_file_changed = function(path)
   {
@@ -278,20 +297,13 @@ function start()
     app.watcher.addPath(path);
   };
 
+
 	app.watcher = new QFileSystemWatcher();
 	scene_path = scene.currentProjectPath() +"/" + scene.currentVersionName() + ".xstage";
 	app.watcher.addPath(scene_path);
 	app.watcher.fileChanged.connect(app.on_file_changed);
   app.avalon_on_file_changed = true;
-
-  app.avalon_client.send(
-    {
-      "module": "avalon.api",
-      "method": "emit",
-      "args": ["application.launched"]
-    },
-    false
-  );
+  */
 }
 
 function TB_sceneOpened()
