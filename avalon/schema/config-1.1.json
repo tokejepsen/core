@@ -29,13 +29,18 @@
         },
         "tasks": {
             "type": "object",
-            "properties": {
-                "short_name": {"type": "string"},
-                "icon": {"type": "string"},
-                "group": {"type": "string"},
-                "label": {"type": "string"}
-            },
-            "required": ["short_name"]
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "icon": {"type": "string"},
+                    "group": {"type": "string"},
+                    "label": {"type": "string"}
+                },
+                "required": [
+                    "short_name"
+                ]
+            }
         },
         "apps": {
             "type": "array",
