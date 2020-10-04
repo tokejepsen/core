@@ -158,51 +158,6 @@ class SubsetsModel(loader_models.SubsetsModel):
             index, value, role
         )
 
-    def setData(self, index, value, role=QtCore.Qt.EditRole):
-        # Trigger additional edit when `version` column changed
-        # because it also updates the information in other columns
-        if index.column() == self.columns_index["version"]:
-            item = index.internalPointer()
-            parent = item["_id"]
-            if isinstance(value, MasterVersionType):
-                versions = list(self.dbcon.find({
-                    "type": {"$in": ["version", "master_version"]},
-                    "parent": parent
-                }, sort=[("name", -1)]))
-
-                version = None
-                last_version = None
-                for __version in versions:
-                    if __version["type"] == "master_version":
-                        version = __version
-                    elif last_version is None:
-                        last_version = __version
-
-                    if version is not None and last_version is not None:
-                        break
-
-                _version = None
-                for __version in versions:
-                    if __version["_id"] == version["version_id"]:
-                        _version = __version
-                        break
-
-                version["data"] = _version["data"]
-                version["name"] = _version["name"]
-                version["is_from_latest"] = (
-                    last_version["_id"] == _version["_id"]
-                )
-
-            else:
-                version = self.dbcon.find_one({
-                    "name": value,
-                    "type": "version",
-                    "parent": parent
-                })
-            self.set_version(index, version)
-
-        return super(SubsetsModel, self).setData(index, value, role)
-
     def set_version(self, index, version):
         """Update the version data of the given index.
 
