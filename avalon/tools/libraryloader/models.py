@@ -417,11 +417,8 @@ class SubsetsModel(loader_models.SubsetsModel):
         groups = {}
         # Update sorted order to config
         for order, data in enumerate(ordered_groups):
-            data.update({
-                # Format orders into fixed length string for groups sorting
-                "order": "0" + order_temp % order,
-                "inverseOrder": "2" + order_temp % (total - order)
-            })
+            # Format orders into fixed length string for groups sorting
+            data["order"] = order_temp % order
             groups[data["name"]] = data
 
         return groups, subset_docs_without_group, subset_docs_by_group
@@ -429,12 +426,9 @@ class SubsetsModel(loader_models.SubsetsModel):
     def create_multiasset_group(
         self, subset_name, asset_ids, subset_counter, parent_item=None
     ):
-        total = len(asset_ids)
-        str_order_temp = "1%0{}d".format(len(str(total)))
         subset_color = self.merged_subset_colors[
             subset_counter % len(self.merged_subset_colors)
         ]
-        inverse_order = total - subset_counter
         merge_group = Item()
         merge_group.update({
             "subset": "{} ({})".format(subset_name, len(asset_ids)),
@@ -442,13 +436,10 @@ class SubsetsModel(loader_models.SubsetsModel):
             "childRow": 0,
             "subsetColor": subset_color,
             "assetIds": list(asset_ids),
-
             "icon": qtawesome.icon(
                 "fa.circle",
                 color="#{0:02x}{1:02x}{2:02x}".format(*subset_color)
-            ),
-            "order": "1{}".format(subset_name),
-            "inverseOrder": str_order_temp % inverse_order
+            )
         })
 
         subset_counter += 1

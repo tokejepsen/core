@@ -540,12 +540,15 @@ class SubsetsModel(TreeModel):
 
         if role == self.SortDescendingRole:
             item = index.internalPointer()
-            if item.get("isGroup") or item.get("isMerged"):
+            if item.get("isGroup"):
                 # Ensure groups be on top when sorting by descending order
-                prefix = "1"
-                order = item["inverseOrder"]
+                prefix = "2"
+                order = item["order"]
             else:
-                prefix = "0"
+                if item.get("isMerged"):
+                    prefix = "1"
+                else:
+                    prefix = "0"
                 order = str(super(SubsetsModel, self).data(
                     index, QtCore.Qt.DisplayRole
                 ))
@@ -553,12 +556,15 @@ class SubsetsModel(TreeModel):
 
         if role == self.SortAscendingRole:
             item = index.internalPointer()
-            if item.get("isGroup") or item.get("isMerged"):
+            if item.get("isGroup"):
                 # Ensure groups be on top when sorting by ascending order
                 prefix = "0"
                 order = item["order"]
             else:
-                prefix = "1"
+                if item.get("isMerged"):
+                    prefix = "1"
+                else:
+                    prefix = "2"
                 order = str(super(SubsetsModel, self).data(
                     index, QtCore.Qt.DisplayRole
                 ))
