@@ -477,37 +477,6 @@ class SubsetsModel(TreeModel):
             }
 
         subset_counter = 0
-        for subset_name in sorted(subset_docs_without_group.keys()):
-            subset_docs = subset_docs_without_group[subset_name]
-            asset_ids = [subset_doc["parent"] for subset_doc in subset_docs]
-            parent_item = None
-            parent_index = None
-            if len(subset_docs) > 1:
-                parent_item = self.create_multiasset_group(
-                    subset_name, asset_ids, subset_counter
-                )
-                parent_index = self.index(parent_item.row(), 0)
-                subset_counter += 1
-
-            for subset_doc in subset_docs:
-                asset_id = subset_doc["parent"]
-
-                data = copy.deepcopy(subset_doc)
-                data["subset"] = subset_name
-                data["asset"] = asset_docs_by_id[asset_id]["name"]
-
-                last_version = last_versions_by_subset_id.get(
-                    subset_doc["_id"]
-                )
-                data["last_version"] = last_version
-
-                item = Item()
-                item.update(data)
-                self.add_child(item, parent_item)
-
-                index = self.index(item.row(), 0, parent_index)
-                self.set_version(index, last_version)
-
         for group_name, subset_docs_by_name in subset_docs_by_group.items():
             parent_item = group_item_by_name[group_name]["item"]
             parent_index = group_item_by_name[group_name]["index"]
@@ -546,6 +515,37 @@ class SubsetsModel(TreeModel):
 
                     index = self.index(item.row(), 0, _parent_index)
                     self.set_version(index, last_version)
+
+        for subset_name in sorted(subset_docs_without_group.keys()):
+            subset_docs = subset_docs_without_group[subset_name]
+            asset_ids = [subset_doc["parent"] for subset_doc in subset_docs]
+            parent_item = None
+            parent_index = None
+            if len(subset_docs) > 1:
+                parent_item = self.create_multiasset_group(
+                    subset_name, asset_ids, subset_counter
+                )
+                parent_index = self.index(parent_item.row(), 0)
+                subset_counter += 1
+
+            for subset_doc in subset_docs:
+                asset_id = subset_doc["parent"]
+
+                data = copy.deepcopy(subset_doc)
+                data["subset"] = subset_name
+                data["asset"] = asset_docs_by_id[asset_id]["name"]
+
+                last_version = last_versions_by_subset_id.get(
+                    subset_doc["_id"]
+                )
+                data["last_version"] = last_version
+
+                item = Item()
+                item.update(data)
+                self.add_child(item, parent_item)
+
+                index = self.index(item.row(), 0, parent_index)
+                self.set_version(index, last_version)
 
         self.endResetModel()
         self.refreshed.emit(True)
