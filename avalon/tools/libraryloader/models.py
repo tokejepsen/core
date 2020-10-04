@@ -103,7 +103,6 @@ class TasksModel(tools_models.TasksModel):
 
 
 class SubsetsModel(loader_models.SubsetsModel):
-
     def __init__(self, dbcon, grouping=True, parent=None):
         self.dbcon = dbcon
         super(SubsetsModel, self).__init__(grouping=grouping, parent=parent)
@@ -159,6 +158,51 @@ class SubsetsModel(loader_models.SubsetsModel):
             index, value, role
         )
 
+    def setData(self, index, value, role=QtCore.Qt.EditRole):
+        # Trigger additional edit when `version` column changed
+        # because it also updates the information in other columns
+        if index.column() == self.columns_index["version"]:
+            item = index.internalPointer()
+            parent = item["_id"]
+            if isinstance(value, MasterVersionType):
+                versions = list(self.dbcon.find({
+                    "type": {"$in": ["version", "master_version"]},
+                    "parent": parent
+                }, sort=[("name", -1)]))
+
+                version = None
+                last_version = None
+                for __version in versions:
+                    if __version["type"] == "master_version":
+                        version = __version
+                    elif last_version is None:
+                        last_version = __version
+
+                    if version is not None and last_version is not None:
+                        break
+
+                _version = None
+                for __version in versions:
+                    if __version["_id"] == version["version_id"]:
+                        _version = __version
+                        break
+
+                version["data"] = _version["data"]
+                version["name"] = _version["name"]
+                version["is_from_latest"] = (
+                    last_version["_id"] == _version["_id"]
+                )
+
+            else:
+                version = self.dbcon.find_one({
+                    "name": value,
+                    "type": "version",
+                    "parent": parent
+                })
+            self.set_version(index, version)
+
+        return super(SubsetsModel, self).setData(index, value, role)
+
     def set_version(self, index, version):
         """Update the version data of the given index.
 
@@ -167,13 +211,16 @@ class SubsetsModel(loader_models.SubsetsModel):
             version (dict) Version document in the database.
 
         """
+
         assert isinstance(index, QtCore.QModelIndex)
         if not index.isValid():
             return
 
         item = index.internalPointer()
-        assert version["parent"] == item["_id"], ("Version does not "
-                                                  "belong to subset")
+
+        assert version["parent"] == item["_id"], (
+            "Version does not belong to subset"
+        )
 
         # Get the data from the version
         version_data = version.get("data", dict())
@@ -216,10 +263,8 @@ class SubsetsModel(loader_models.SubsetsModel):
         family = families[0]
         family_config = lib.get_family_cached_config(family)
 
-        version_value = version["name"]
-
         item.update({
-            "version": version_value,
+            "version": version["name"],
             "version_document": version,
             "author": version_data.get("author", None),
             "time": version_data.get("time", None),
@@ -235,13 +280,101 @@ class SubsetsModel(loader_models.SubsetsModel):
             "step": version_data.get("step", None)
         })
 
-    def refresh(self):
+    def _fetch(self):
+        asset_docs = self.dbcon.find({
+            "type": "asset",
+            "_id": {"$in": self._asset_ids}
+        })
+        asset_docs_by_id = {
+            asset_doc["_id"]: asset_doc
+            for asset_doc in asset_docs
+        }
 
+        subset_docs_by_id = {}
+        for subset in self.dbcon.find({
+            "type": "subset",
+            "parent": {"$in": self._asset_ids}
+        }):
+            if self._doc_fetching_stop:
+                return
+            subset_docs_by_id[subset["_id"]] = subset
+
+        subset_ids = list(subset_docs_by_id.keys())
+        _pipeline = [
+            # Find all versions of those subsets
+            {"$match": {
+                "type": "version",
+                "parent": {"$in": subset_ids}
+            }},
+            # Sorting versions all together
+            {"$sort": {"name": 1}},
+            # Group them by "parent", but only take the last
+            {"$group": {
+                "_id": "$parent",
+                "_version_id": {"$last": "$_id"},
+                "name": {"$last": "$name"},
+                "type": {"$last": "$type"},
+                "data": {"$last": "$data"},
+                "locations": {"$last": "$locations"},
+                "schema": {"$last": "$schema"}
+            }}
+        ]
+        last_versions_by_subset_id = dict()
+        for doc in self.dbcon.aggregate(_pipeline):
+            if self._doc_fetching_stop:
+                return
+            doc["parent"] = doc["_id"]
+            doc["_id"] = doc.pop("_version_id")
+            last_versions_by_subset_id[doc["parent"]] = doc
+
+        master_versions = self.dbcon.find({
+            "type": "master_version",
+            "parent": {"$in": subset_ids}
+        })
+        missing_versions = []
+        for master_version in master_versions:
+            version_id = master_version["version_id"]
+            if version_id not in last_versions_by_subset_id:
+                missing_versions.append(version_id)
+
+        missing_versions_by_id = {}
+        if missing_versions:
+            missing_version_docs = self.dbcon.find({
+                "type": "version",
+                "_id": {"$in": missing_versions}
+            })
+            missing_versions_by_id = {
+                missing_version_doc["_id"]: missing_version_doc
+                for missing_version_doc in missing_version_docs
+            }
+
+        for master_version in master_versions:
+            version_id = master_version["version_id"]
+            subset_id = master_version["parent"]
+
+            version_doc = last_versions_by_subset_id.get(subset_id)
+            if version_doc is None:
+                version_doc = missing_versions_by_id.get(version_id)
+                if version_doc is None:
+                    continue
+
+            master_version["data"] = version_doc["data"]
+            master_version["name"] = MasterVersionType(version_doc["name"])
+            # Add information if master version is from latest version
+            master_version["is_from_latest"] = version_id == version_doc["_id"]
+
+            last_versions_by_subset_id[subset_id] = master_version
+
+        self._doc_payload = {
+            "asset_docs_by_id": asset_docs_by_id,
+            "subset_docs_by_id": subset_docs_by_id,
+            "last_versions_by_subset_id": last_versions_by_subset_id
+        }
+        self.doc_fetched.emit()
+
+    def on_doc_fetched(self):
         self.clear()
         self.beginResetModel()
-        if not self._asset_ids:
-            self.endResetModel()
-            return
 
         active_groups = []
         for asset_id in self._asset_ids:
@@ -249,72 +382,49 @@ class SubsetsModel(loader_models.SubsetsModel):
             if result:
                 active_groups.extend(result)
 
-        filtered_subsets = [
-            sub for sub in self.dbcon.find({
-                "type": "subset", "parent": {"$in": self._asset_ids}
-            })
-        ]
-
-        asset_entities = {}
-        for asset_id in self._asset_ids:
-            asset_ent = self.dbcon.find_one({"_id": asset_id})
-            asset_entities[asset_id] = asset_ent
-
-        # Collect last versions
-        last_versions = {}
-        for subset in filtered_subsets:
-            last_version = self.dbcon.find_one({
-                "type": "version",
-                "parent": subset["_id"]
-            }, sort=[("name", -1)])
-
-            master_version = self.dbcon.find_one({
-                "type": "master_version",
-                "parent": subset["_id"]
-            })
-            if master_version:
-                _version = self.dbcon.find_one({
-                    "_id": master_version["version_id"]
-                })
-                master_version["data"] = _version["data"]
-                master_version["name"] = MasterVersionType(_version["name"])
-                # Add information if master version is from latest version
-                is_from_latest = True
-                if last_version:
-                    is_from_latest = last_version["_id"] == _version["_id"]
-                master_version["is_from_latest"] = is_from_latest
-
-                last_versions[subset["_id"]] = master_version
-                continue
-
-            # No published version for the subset
-            last_versions[subset["_id"]] = last_version
+        asset_docs_by_id = self._doc_payload.get(
+            "asset_docs_by_id"
+        )
+        subset_docs_by_id = self._doc_payload.get(
+            "subset_docs_by_id"
+        )
+        last_versions_by_subset_id = self._doc_payload.get(
+            "last_versions_by_subset_id"
+        )
+        if (
+            asset_docs_by_id is None
+            or subset_docs_by_id is None
+            or last_versions_by_subset_id is None
+            or len(self._asset_ids) == 0
+        ):
+            self.endResetModel()
+            self.refreshed.emit(False)
+            return
 
         # Prepare data if is selected more than one asset
-        process_only_single_asset = True
-        merge_subsets = False
-        if len(self._asset_ids) >= 2:
-            process_only_single_asset = False
+        process_only_single_asset = len(self._asset_ids) == 1
+        if not process_only_single_asset:
             all_subset_names = []
             multiple_asset_names = []
 
-            for subset in filtered_subsets:
+            for subset_id, subset_doc in subset_docs_by_id.items():
                 # No published version for the subset
-                if not last_versions[subset["_id"]]:
+                if not last_versions_by_subset_id[subset_id]:
                     continue
 
-                name = subset["name"]
-                if name in all_subset_names:
+                name = subset_doc["name"]
+                if name not in all_subset_names:
+                    all_subset_names.append(name)
+                else:
                     # process_only_single_asset = False
-                    merge_subsets = True
                     if name not in multiple_asset_names:
                         multiple_asset_names.append(name)
-                else:
-                    all_subset_names.append(name)
-
         # Process subsets
         row = 0
         group_items = dict()
+
+        single_asset_subsets = {}
+        multi_asset_subsets = {}
 
         # When only one asset is selected
         if process_only_single_asset:
@@ -339,100 +449,100 @@ class SubsetsModel(loader_models.SubsetsModel):
                     self.add_child(group)
 
             row = len(group_items)
-            single_asset_subsets = filtered_subsets
+            single_asset_subsets = subset_docs_by_id
 
         # When multiple assets are selected
         else:
-            single_asset_subsets = []
-            multi_asset_subsets = {}
-
-            for subset in filtered_subsets:
-                last_version = last_versions[subset["_id"]]
+            for subset_id, subset_doc in subset_docs_by_id.items():
+                last_version = last_versions_by_subset_id.get(subset_id)
                 if not last_version:
                     continue
 
-                data = subset.copy()
-                name = data["name"]
-                asset_name = asset_entities[data["parent"]]["name"]
+                subset_name = subset_doc["name"]
+                if subset_name not in multiple_asset_names:
+                    single_asset_subsets[subset_id] = subset_doc
+                    continue
 
-                data["subset"] = name
-                data["asset"] = asset_name
+                asset_id = subset_doc["parent"]
 
-                asset_subset_data = {
+                data = subset_doc.copy()
+                data["subset"] = subset_name
+                data["asset"] = asset_docs_by_id[asset_id]["name"]
+
+                if subset_name not in multi_asset_subsets:
+                    multi_asset_subsets[subset_name] = {}
+                multi_asset_subsets[subset_name][asset_id] = {
                     "data": data,
                     "last_version": last_version
                 }
 
-                if name in multiple_asset_names:
-                    if name not in multi_asset_subsets:
-                        multi_asset_subsets[name] = {}
-                    multi_asset_subsets[name][data["parent"]] = (
-                        asset_subset_data
-                    )
-                else:
-                    single_asset_subsets.append(data)
+        if not single_asset_subsets and not multi_asset_subsets:
+            self.endResetModel()
+            self.refreshed.emit(False)
+            return
 
-            color_count = len(self.merged_subset_colors)
-            subset_counter = 0
-            total = len(multi_asset_subsets)
-            str_order_temp = "%0{}d".format(len(str(total)))
+        color_count = len(self.merged_subset_colors)
+        subset_counter = 0
+        total = len(multi_asset_subsets)
+        str_order_temp = "%0{}d".format(len(str(total)))
 
-            for subset_name, per_asset_data in multi_asset_subsets.items():
-                subset_color = self.merged_subset_colors[
-                    subset_counter % color_count
-                ]
-                inverse_order = total - subset_counter
+        for subset_name, per_asset_data in multi_asset_subsets.items():
+            subset_color = self.merged_subset_colors[
+                subset_counter % color_count
+            ]
+            inverse_order = total - subset_counter
 
-                merge_group = Item()
-                merge_group.update({
-                    "subset": "{} ({})".format(
-                        subset_name, str(len(per_asset_data))
-                    ),
-                    "isMerged": True,
-                    "childRow": 0,
-                    "subsetColor": subset_color,
-                    "assetIds": [id for id in per_asset_data],
+            merge_group = Item()
+            merge_group.update({
+                "subset": "{} ({})".format(
+                    subset_name, str(len(per_asset_data))
+                ),
+                "isMerged": True,
+                "childRow": 0,
+                "subsetColor": subset_color,
+                "assetIds": list(per_asset_data.keys()),
 
-                    "icon": qtawesome.icon(
-                        "fa.circle",
-                        color="#{0:02x}{1:02x}{2:02x}".format(*subset_color)
-                    ),
-                    "order": "0{}".format(subset_name),
-                    "inverseOrder": str_order_temp % inverse_order
-                })
+                "icon": qtawesome.icon(
+                    "fa.circle",
+                    color="#{0:02x}{1:02x}{2:02x}".format(*subset_color)
+                ),
+                "order": "0{}".format(subset_name),
+                "inverseOrder": str_order_temp % inverse_order
+            })
 
-                subset_counter += 1
-                row += 1
-                group_items[subset_name] = merge_group
-                self.add_child(merge_group)
+            subset_counter += 1
+            row += 1
+            group_items[subset_name] = merge_group
+            self.add_child(merge_group)
 
-                merge_group_index = self.createIndex(0, 0, merge_group)
+            merge_group_index = self.createIndex(0, 0, merge_group)
 
-                for asset_id, asset_subset_data in per_asset_data.items():
-                    last_version = asset_subset_data["last_version"]
-                    data = asset_subset_data["data"]
+            for asset_subset_data in per_asset_data.values():
+                last_version = asset_subset_data["last_version"]
+                data = asset_subset_data["data"]
 
-                    row_ = merge_group["childRow"]
-                    merge_group["childRow"] += 1
+                row_ = merge_group["childRow"]
+                merge_group["childRow"] += 1
 
-                    item = Item()
-                    item.update(data)
+                item = Item()
+                item.update(data)
 
-                    self.add_child(item, parent=merge_group)
+                self.add_child(item, parent=merge_group)
 
-                    # Set the version information
-                    index = self.index(row_, 0, parent=merge_group_index)
-                    self.set_version(index, last_version)
+                # Set the version information
+                index = self.index(row_, 0, parent=merge_group_index)
+                self.set_version(index, last_version)
 
-        for subset in single_asset_subsets:
-            last_version = last_versions[subset["_id"]]
+        for subset_id, subset_doc in single_asset_subsets.items():
+            last_version = last_versions_by_subset_id[subset_id]
             if not last_version:
                 continue
 
-            data = subset.copy()
-            data["subset"] = data["name"]
+            data = subset_doc.copy()
+            data["subset"] = subset_doc["name"]
+            data["asset"] = asset_docs_by_id[subset_doc["parent"]]["name"]
 
-            group_name = subset["data"].get("subsetGroup")
+            group_name = subset_doc["data"].get("subsetGroup")
             if process_only_single_asset:
                 if self._grouping and group_name:
                     group = group_items[group_name]
@@ -461,6 +571,7 @@ class SubsetsModel(loader_models.SubsetsModel):
             self.set_version(index, last_version)
 
         self.endResetModel()
+        self.refreshed.emit(True)
 
 
 class FamiliesFilterProxyModel(loader_models.FamiliesFilterProxyModel):
