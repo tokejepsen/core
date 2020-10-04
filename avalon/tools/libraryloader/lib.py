@@ -127,62 +127,6 @@ def refresh_group_config_cache(dbcon):
     return groups
 
 
-def get_active_group_config(dbcon, asset_id, include_predefined=False):
-    """Collect all active groups from each subset"""
-    predefineds = GROUP_CONFIG_CACHE.copy()
-    default_group_config = predefineds.pop("__default__")
-
-    _orders = set([0])  # default order zero included
-    for config in predefineds.values():
-        _orders.add(config["order"])
-
-    # Remap order to list index
-    orders = sorted(_orders)
-
-    # Collect groups from subsets
-    group_names = set(dbcon.distinct("data.subsetGroup",
-                                  {"type": "subset", "parent": asset_id}))
-    if include_predefined:
-        # Ensure all predefined group configs will be included
-        group_names.update(predefineds.keys())
-
-    groups = list()
-
-    for name in group_names:
-        # Get group config
-        config = predefineds.get(name, default_group_config)
-        # Base order
-        remapped_order = orders.index(config["order"])
-
-        data = {
-            "name": name,
-            "icon": config["icon"],
-            "_order": remapped_order,
-        }
-
-        groups.append(data)
-
-    # Sort by tuple (base_order, name)
-    # If there are multiple groups in same order, will sorted by name.
-    ordered = sorted(groups, key=lambda dat: (dat.pop("_order"), dat["name"]))
-
-    total = len(ordered)
-    order_temp = "%0{}d".format(len(str(total)))
-
-    # Update sorted order to config
-    for index, data in enumerate(ordered):
-        order = index
-        inverse_order = total - order
-
-        data.update({
-            # Format orders into fixed length string for groups sorting
-            "order": order_temp % order,
-            "inverseOrder": order_temp % inverse_order,
-        })
-
-    return ordered
-
-
 # `find_config` from `pipeline`
 #     - added 'dbcon' to args
 #         - dbcon.session replaced Session in code

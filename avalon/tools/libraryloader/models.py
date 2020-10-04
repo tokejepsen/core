@@ -332,12 +332,6 @@ class SubsetsModel(loader_models.SubsetsModel):
         self.clear()
         self.beginResetModel()
 
-        active_groups = []
-        for asset_id in self._asset_ids:
-            result = lib.get_active_group_config(self.dbcon, asset_id)
-            if result:
-                active_groups.extend(result)
-
         asset_docs_by_id = self._doc_payload.get(
             "asset_docs_by_id"
         )
