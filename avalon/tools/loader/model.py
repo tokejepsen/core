@@ -652,19 +652,15 @@ class GroupMemberFilterProxyModel(QtCore.QSortFilterProxyModel):
 
 
 class SubsetFilterProxyModel(GroupMemberFilterProxyModel):
-
     def filterAcceptsRow(self, row, parent):
-
         model = self.sourceModel()
-        index = model.index(row,
-                            self.filterKeyColumn(),
-                            parent)
+        index = model.index(row, self.filterKeyColumn(), parent)
         item = index.internalPointer()
         if item.get("isGroup"):
             return self.filter_accepts_group(index, model)
-        else:
-            return super(SubsetFilterProxyModel,
-                         self).filterAcceptsRow(row, parent)
+        return super(
+            SubsetFilterProxyModel, self
+        ).filterAcceptsRow(row, parent)
 
 
 class FamiliesFilterProxyModel(GroupMemberFilterProxyModel):
