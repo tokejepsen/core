@@ -1,6 +1,5 @@
 import collections
 import logging
-import copy
 
 from .. import models as tools_models
 from ..loader import model as loader_models
