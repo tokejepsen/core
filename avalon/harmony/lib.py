@@ -12,6 +12,7 @@ import contextlib
 import json
 import signal
 import time
+from uuid import uuid4
 
 from .server import Server
 from ..vendor.Qt import QtWidgets
@@ -29,6 +30,8 @@ self.port = None
 # Setup logging.
 self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
+
+signature = str(uuid4())
 
 
 class _ZipFile(zipfile.ZipFile):
@@ -75,6 +78,15 @@ def launch(application_path):
     # No launch through Workfiles happened.
     if not self.workfile_path:
         zip_file = os.path.join(os.path.dirname(__file__), "temp.zip")
+        temp_path = get_local_harmony_path(zip_file)
+        if os.path.exists(temp_path):
+            self.log.info(f"removing existing {temp_path}")
+            try:
+                shutil.rmtree(temp_path)
+            except Exception as e:
+                self.log.critical(f"cannot clear {temp_path}")
+                raise Exception(f"cannot clear {temp_path}") from e
+
         launch_zip_file(zip_file)
 
     self.callback_queue = queue.Queue()
@@ -126,6 +138,39 @@ def launch_zip_file(filepath):
 
     # Save workfile path for later.
     self.workfile_path = filepath
+
+    # find any xstage files is directory, prefer the one with the same name
+    # as directory (plus extension)
+    xstage_files = []
+    for _, _, files in os.walk(temp_path):
+        for file in files:
+            if os.path.splitext(file)[1] == ".xstage":
+                xstage_files.append(file)
+
+    if not os.path.basename("temp.zip"):
+        if not xstage_files:
+            self.server.stop()
+            print("no xstage file was found")
+            return
+
+    # try to use first available
+    scene_path = os.path.join(
+        temp_path, xstage_files[0]
+    )
+
+    # prefer the one named as zip file
+    zip_based_name = "{}.xstage".format(
+        os.path.splitext(os.path.basename(filepath))[0])
+
+    if zip_based_name in xstage_files:
+        scene_path = os.path.join(
+            temp_path, zip_based_name
+        )
+
+    if not os.path.exists(scene_path):
+        print("error: cannot determine scene file")
+        self.server.stop()
+        return
 
     print("Launching {}".format(scene_path))
     process = subprocess.Popen([self.application_path, scene_path])
@@ -204,7 +249,7 @@ def show(module_name):
 
 
 def get_scene_data():
-    func = """function func(args)
+    func = """function %s_func(args)
     {
         var metadata = scene.metadata("avalon");
         if (metadata){
@@ -213,8 +258,8 @@ def get_scene_data():
             return {};
         }
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     try:
         return self.send({"function": func})["result"]
     except json.decoder.JSONDecodeError:
@@ -227,7 +272,7 @@ def get_scene_data():
 
 def set_scene_data(data):
     # Write scene data.
-    func = """function func(args)
+    func = """function %s_func(args)
     {
         scene.setMetadata({
           "name"       : "avalon",
@@ -237,8 +282,8 @@ def set_scene_data(data):
           "value"      : JSON.stringify(args[0])
         });
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func, "args": [data]})
 
 
@@ -287,7 +332,6 @@ def imprint(node_id, data, remove=False):
             scene_data[node_id].update(data)
         else:
             scene_data[node_id] = data
-
 
     set_scene_data(scene_data)
 
@@ -346,19 +390,19 @@ def maintained_nodes_state(nodes):
         )
 
     # Disable all nodes.
-    func = """function func(nodes)
+    func = """function %s_func(nodes)
     {
         for (var i = 0 ; i < nodes.length; i++)
         {
             node.setEnable(nodes[i], false);
         }
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func, "args": [nodes]})
 
     # Restore state after yield.
-    func = """function func(args)
+    func = """function %s_func(args)
     {
         var nodes = args[0];
         var states = args[1];
@@ -367,8 +411,8 @@ def maintained_nodes_state(nodes):
             node.setEnable(nodes[i], states[i]);
         }
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
 
     try:
         yield
@@ -386,7 +430,7 @@ def save_scene():
     """
     # Need to turn off the backgound watcher else the communication with
     # the server gets spammed with two requests at the same time.
-    func = """function func()
+    func = """function %s_func()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = false;
@@ -396,21 +440,21 @@ def save_scene():
             scene.currentVersionName() + ".xstage"
         );
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     scene_path = self.send({"function": func})["result"]
 
     # Manually update the remote file.
     self.on_file_changed(scene_path, threaded=False)
 
     # Re-enable the background watcher.
-    func = """function func()
+    func = """function %s_func()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = true;
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func})
 
 

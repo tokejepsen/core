@@ -10,6 +10,7 @@ import subprocess
 import importlib
 import logging
 import filecmp
+from uuid import uuid4
 
 from .server import Server
 from ..tools import workfiles
@@ -28,6 +29,8 @@ self.application_name = None
 # Setup logging.
 self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
+
+signature = str(uuid4())
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):
@@ -294,7 +297,7 @@ def save_scene():
     """
     # Need to turn off the backgound watcher else the communication with
     # the server gets spammed with two requests at the same time.
-    func = """function func()
+    func = """function %s_func()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = false;
@@ -303,19 +306,19 @@ def save_scene():
             scene.currentProjectPath() + "/" + scene.currentVersionName()
         );
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     scene_path = self.send({"function": func})["result"] + "." + self.extension
 
     # Manually update the remote file.
     self.on_file_changed(scene_path)
 
     # Re-enable the background watcher.
-    func = """function func()
+    func = """function %s_func()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = true;
     }
-    func
-    """
+    %s_func
+    """ % (signature, signature)
     self.send({"function": func})
