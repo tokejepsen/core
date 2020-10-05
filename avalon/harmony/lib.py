@@ -42,7 +42,7 @@ def signature(postfix="func") -> str:
         str: random function name.
 
     """
-    return "{}_{}".format(str(uuid4()).replace("-", "_"), postfix)
+    return "f{}_{}".format(str(uuid4()).replace("-", "_"), postfix)
 
 
 class _ZipFile(zipfile.ZipFile):
@@ -436,7 +436,7 @@ def maintained_nodes_state(nodes):
 
 
 def save_scene():
-    """Saves the Harmony scene safely.
+    """Save the Harmony scene safely.
 
     The built-in (to Avalon) background zip and moving of the Harmony scene
     folder, interfers with server/client communication by sending two requests
@@ -477,7 +477,6 @@ def save_scene():
 
 def save_scene_as(filepath):
     """Save Harmony scene as `filepath`."""
-
     scene_dir = os.path.dirname(filepath)
     destination = os.path.join(
         os.path.dirname(self.workfile_path),
