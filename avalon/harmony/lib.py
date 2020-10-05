@@ -31,7 +31,18 @@ self.port = None
 self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
 
-signature = str(uuid4())
+
+def signature(postfix="func") -> str:
+    """Return random ECMA6 compatible function name.
+
+    Args;
+        postfix (str): name to append to random string.
+
+    Returns:
+        str: random function name.
+
+    """
+    return "{}_{}".format(str(uuid4()).replace("-", "_"), postfix)
 
 
 class _ZipFile(zipfile.ZipFile):
@@ -249,7 +260,8 @@ def show(module_name):
 
 
 def get_scene_data():
-    func = """function %s_func(args)
+    sig = signature("get_scene_data")
+    func = """function %s(args)
     {
         var metadata = scene.metadata("avalon");
         if (metadata){
@@ -258,8 +270,8 @@ def get_scene_data():
             return {};
         }
     }
-    %s_func
-    """ % (signature, signature)
+    %s
+    """ % (sig, sig)
     try:
         return self.send({"function": func})["result"]
     except json.decoder.JSONDecodeError:
@@ -272,7 +284,8 @@ def get_scene_data():
 
 def set_scene_data(data):
     # Write scene data.
-    func = """function %s_func(args)
+    sig = signature("set_scene_data")
+    func = """function %s(args)
     {
         scene.setMetadata({
           "name"       : "avalon",
@@ -282,8 +295,8 @@ def set_scene_data(data):
           "value"      : JSON.stringify(args[0])
         });
     }
-    %s_func
-    """ % (signature, signature)
+    %s
+    """ % (sig, sig)
     self.send({"function": func, "args": [data]})
 
 
@@ -339,8 +352,8 @@ def imprint(node_id, data, remove=False):
 @contextlib.contextmanager
 def maintained_selection():
     """Maintain selection during context."""
-
-    func = """function get_selection_nodes()
+    sig = signature("get_selection_nodes")
+    func = """function %s()
     {
         var selection_length = selection.numberOfNodesSelected();
         var selected_nodes = [];
@@ -350,11 +363,12 @@ def maintained_selection():
         }
         return selected_nodes
     }
-    get_selection_nodes
-    """
+    %s
+    """ % (sig, sig)
     selected_nodes = self.send({"function": func})["result"]
 
-    func = """function select_nodes(node_paths)
+    sig = signature("select_nodes")
+    func = """function %s(node_paths)
     {
         selection.clearSelection();
         for (var i = 0 ; i < node_paths.length; i++)
@@ -362,8 +376,8 @@ def maintained_selection():
             selection.addNodeToSelection(node_paths[i]);
         }
     }
-    select_nodes
-    """
+    %s
+    """ % (sig, sig)
     try:
         yield selected_nodes
     finally:
@@ -390,19 +404,20 @@ def maintained_nodes_state(nodes):
         )
 
     # Disable all nodes.
-    func = """function %s_func(nodes)
+    sig = signature("disable_all_nodes")
+    func = """function %s(nodes)
     {
         for (var i = 0 ; i < nodes.length; i++)
         {
             node.setEnable(nodes[i], false);
         }
     }
-    %s_func
-    """ % (signature, signature)
+    %s
+    """ % (sig, sig)
     self.send({"function": func, "args": [nodes]})
-
+    sig = signature("restore")
     # Restore state after yield.
-    func = """function %s_func(args)
+    func = """function %s(args)
     {
         var nodes = args[0];
         var states = args[1];
@@ -411,8 +426,8 @@ def maintained_nodes_state(nodes):
             node.setEnable(nodes[i], states[i]);
         }
     }
-    %s_func
-    """ % (signature, signature)
+    %s
+    """ % (sig, sig)
 
     try:
         yield
@@ -430,7 +445,8 @@ def save_scene():
     """
     # Need to turn off the backgound watcher else the communication with
     # the server gets spammed with two requests at the same time.
-    func = """function %s_func()
+    sig = signature("save_scene")
+    func = """function %s()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = false;
@@ -440,21 +456,22 @@ def save_scene():
             scene.currentVersionName() + ".xstage"
         );
     }
-    %s_func
-    """ % (signature, signature)
+    %s
+    """ % (sig, sig)
     scene_path = self.send({"function": func})["result"]
 
     # Manually update the remote file.
     self.on_file_changed(scene_path, threaded=False)
 
     # Re-enable the background watcher.
-    func = """function %s_func()
+    sig = signature("enable_watcher")
+    func = """function %s()
     {
         var app = QCoreApplication.instance();
         app.avalon_on_file_changed = true;
     }
-    %s_func
-    """ % (signature, signature)
+    %s
+    """ % (sig, sig)
     self.send({"function": func})
 
 
@@ -477,14 +494,14 @@ def save_scene_as(filepath):
     zip_and_move(scene_dir, destination)
 
     self.workfile_path = destination
-
-    func = """function add_path(path)
+    sig = signature("add_path")
+    func = """function %s(path)
     {
         var app = QCoreApplication.instance();
         app.watcher.addPath(path);
     }
-    add_path
-    """
+    %s
+    """ % (sig, sig)
     send(
         {"function": func, "args": [filepath]}
     )
