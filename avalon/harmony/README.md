@@ -69,7 +69,7 @@ To send a function with multiple arguments its best to declare the arguments wit
 from avalon import harmony
 from uuid import uuid4
 
-
+signature = str(uuid4()).replace("-", "_")
 func = """function %s_hello(args)
 {
   var greeting = args[0];
@@ -77,7 +77,7 @@ func = """function %s_hello(args)
   return (greeting + " " + person + "!");
 }
 %s_hello
-""" % (uuid4(), uuid4())
+""" % (signature, signature)
 print(harmony.send({"function": func, "args": ["Hello", "Python"]})["result"])
 ```
 
@@ -86,7 +86,7 @@ print(harmony.send({"function": func, "args": ["Hello", "Python"]})["result"])
 When naming your functions be aware that they are executed in global scope. They can potentially clash with Harmony own function and object names.
 For example `func` is already existing Harmony object. When you call your function `func` it will overwrite in global scope the one from Harmony, causing
 erratic behavior of Harmony. Avalon is prefixing those function names with [UUID4](https://docs.python.org/3/library/uuid.html) making chance of such clash minimal.
-See above examples how that works. This will result in function named `38dfcef0-a6d7-4064-8069-51fe99ab276e_hello()`.
+See above examples how that works. This will result in function named `38dfcef0_a6d7_4064_8069_51fe99ab276e_hello()`.
 You can find list of Harmony object and function in Harmony documentation.
 
 ### Scene Save
@@ -141,12 +141,13 @@ class CreateRender(harmony.Creator):
         super(CreateRender, self).__init__(*args, **kwargs)
 
     def setup_node(self, node):
+        signature = str(uuid4()).replace("-", "_")
         func = """function %s_func(args)
         {
             node.setTextAttr(args[0], "DRAWING_TYPE", 1, "PNG4");
         }
         %s_func
-        """ % (uuid4(), uuid4())
+        """ % (signature, signature)
         harmony.send(
             {"function": func, "args": [node]}
         )
@@ -227,6 +228,7 @@ class ExtractImage(pyblish.api.InstancePlugin):
 
         # Store display source node for later.
         display_node = "Top/Display"
+        signature = str(uuid4()).replace("-", "_")
         func = """function %s_func(display_node)
         {
             var source_node = null;
@@ -238,7 +240,7 @@ class ExtractImage(pyblish.api.InstancePlugin):
             return source_node
         }
         %s_func
-        """ % (uuid4(), uuid4())
+        """ % (signature, signature)
         display_source_node = harmony.send(
             {"function": func, "args": [display_node]}
         )["result"]
@@ -267,7 +269,7 @@ class ExtractImage(pyblish.api.InstancePlugin):
             render.frameReady.disconnect(frameReady);
         }}
         %s_func
-        """ % (uuid4(), uuid4())
+        """ % (signature, signature)
         restore_func = """function %s_func(args)
         {
             var display_node = args[0];
@@ -279,7 +281,7 @@ class ExtractImage(pyblish.api.InstancePlugin):
             node.link(display_source_node, 0, display_node, 0);
         }
         %s_func
-        """ % (uuid4(), uuid4())
+        """ % (signature, signature)
 
         with harmony.maintained_selection():
             self.log.info("Extracting %s" % str(list(instance)))
@@ -333,6 +335,7 @@ import os
 
 from avalon import api, harmony, io
 
+signature = str(uuid4()).replace("-", "_")
 copy_files = """function copyFile(srcFilename, dstFilename)
 {
     var srcFile = new PermanentFile(srcFilename);
@@ -449,7 +452,7 @@ import_files = """function %s_import_files()
   import_files();
 }
 %s_import_files
-""" % (uuid4(), uuid4())
+""" % (signature, signature)
 
 replace_files = """function %s_replace_files(args)
 {
@@ -482,7 +485,7 @@ replace_files = """function %s_replace_files(args)
     }
 }
 %s_replace_files
-""" % (uuid4(), uuid4())
+""" % (signature, signature)
 
 
 class ImageSequenceLoader(api.Loader):
@@ -543,12 +546,13 @@ class ImageSequenceLoader(api.Loader):
 
     def remove(self, container):
         node = container.pop("node")
+        signature = str(uuid4()).replace("-", "_")
         func = """function %s_deleteNode(_node)
         {
             node.deleteNode(_node, true, true);
         }
         %_deleteNode
-        """ % (uuid4(), uuid4())
+        """ % (signature, signature)
         harmony.send(
             {"function": func, "args": [node]}
         )

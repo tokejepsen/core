@@ -3,7 +3,7 @@ function Client()
   var self = this;
   self.socket = new QTcpSocket(this);
   self.received = "";
-  self.lock = 0;
+  self.lock = 1;
 
   self.log_debug = function(data)
   {
@@ -83,7 +83,9 @@ function Client()
 
     self.log_debug("Received: " + self.received);
 
+
     request = JSON.parse(self.received);
+
     self.log_debug("Request: " + JSON.stringify(request));
 
     request.result = self.process_request(request);
@@ -102,9 +104,11 @@ function Client()
   self.on_connected = function()
   {
     self.log_debug("Connected to server.");
+    self.lock = 0;
     self.socket.readyRead.connect(self.on_ready_read);
 
     var app = QCoreApplication.instance();
+
     app.avalon_client.send(
       {
         "module": "avalon.api",
@@ -141,7 +145,7 @@ function Client()
 
   self.send = function(request, wait)
   {
-    if (self.locked !== 0) {
+    if (self.lock !== 0) {
       self.log_debug("Still locked, waiting for unlock ...");
       self.waitForLock();
     }
