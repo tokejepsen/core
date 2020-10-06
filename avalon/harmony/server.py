@@ -8,7 +8,6 @@ import importlib
 import functools
 import time
 from datetime import datetime
-
 from . import lib
 
 
@@ -40,7 +39,8 @@ class Server(object):
 
         # Bind the socket to the port
         server_address = ("localhost", port)
-        self.log.debug("Starting up on {}".format(server_address))
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug(f"[{timestamp}] Starting up on {server_address}")
         self.socket.bind(server_address)
 
         # Listen for incoming connections
@@ -59,9 +59,10 @@ class Server(object):
                 "reply" (bool),  # Optional wait for method completion.
             }
         """
+        pretty = self._pretty(request)
         timestamp = datetime.now().strftime("%H:%M:%S.%f")
         self.log.debug(
-            "Processing request [{}]: {}".format(timestamp, request))
+            f"[{timestamp}] Processing request:\n{pretty}")
 
         try:
             module = importlib.import_module(request["module"])
@@ -89,7 +90,8 @@ class Server(object):
             while True:
                 time.sleep(0.1)
                 if time.time() > current_time + 30:
-                    self.log.error("Connection timeout.")
+                    timestamp = datetime.now().strftime("%H:%M:%S.%f")
+                    self.log.error(f"[{timestamp}] Connection timeout.")
                     break
                 if self.connection is None:
                     break
@@ -102,8 +104,9 @@ class Server(object):
                     break
 
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")
+                pretty = self._pretty(self.received)
                 self.log.debug(
-                    "Received [{}]: {}".format(timestamp, self.received))
+                    f"[{timestamp}] Received:\n{pretty}")
 
                 try:
                     request = json.loads(self.received)
@@ -116,22 +119,22 @@ class Server(object):
 
             self.received = ""
             timestamp = datetime.now().strftime("%H:%M:%S.%f")
-            self.log.debug("Request [{}]: {}".format(timestamp, request))
+            pretty = self._pretty(request)
+            self.log.debug(f"[{timestamp}] Request:\n{pretty}")
             if "message_id" in request.keys():
                 self.log.debug("--- storing request as {}".format(
                     request["message_id"]))
                 self.queue[request["message_id"]] = request
             if "reply" not in request.keys():
                 request["reply"] = True
-                self.log.debug("Sending reply ...")
                 self._send(json.dumps(request))
-                self.log.debug("Processing request ...")
                 self.process_request(request)
 
                 if "message_id" in request.keys():
                     try:
-                        self.log.debug("Removing from queue {}".format(
-                            request["message_id"]))
+                        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+                        self.log.debug("[{}] Removing from queue {}".format(
+                            timestamp, request["message_id"]))
                         del self.queue[request["message_id"]]
                     except IndexError:
                         self.log.debug("{} is no longer in queue".format(
@@ -145,16 +148,19 @@ class Server(object):
         Waits for a connection on `self.port` before going into listen mode.
         """
         # Wait for a connection
-        self.log.debug("Waiting for a connection.")
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug(f"[{timestamp}] Waiting for a connection.")
         self.connection, client_address = self.socket.accept()
 
-        self.log.debug("Connection from: {}".format(client_address))
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug(f"[{timestamp}] Connection from: {client_address}")
 
         self.receive()
 
     def stop(self):
         """Shutdown socket server gracefully."""
-        self.log.debug("Shutting down server.")
+        timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        self.log.debug(f"[{timestamp}] Shutting down server.")
         if self.connection is None:
             self.log.debug("Connect to shutdown.")
             socket.socket(
@@ -177,8 +183,9 @@ class Server(object):
             pass
 
         timestamp = datetime.now().strftime("%H:%M:%S.%f")
+        pretty = self._pretty(message)
         self.log.debug(
-            "Sending [{}][{}]: {}".format(self.message_id, timestamp, message))
+            f"[{timestamp}] Sending [{self.message_id}]:\n{pretty}")
         self.connection.sendall(message.encode("utf-8"))
         self.message_id += 1
 
@@ -193,7 +200,9 @@ class Server(object):
         request["message_id"] = self.message_id
         self._send(json.dumps(request))
         if request.get("reply"):
-            self.log.debug("sent reply, not waiting for anything.")
+            timestamp = datetime.now().strftime("%H:%M:%S.%f")
+            self.log.debug(
+                f"[{timestamp}] sent reply, not waiting for anything.")
             return None
         result = None
         current_time = time.time()
@@ -202,18 +211,19 @@ class Server(object):
             time.sleep(0.1)
             if time.time() > current_time + 30:
                 timestamp = datetime.now().strftime("%H:%M:%S.%f")
-                self.log.error(("[{}][{}] No reply from Harmony in 30s. "
-                                "Retrying {}").format(request["message_id"],
-                                                      timestamp, try_index))
+                self.log.error((f"[{timestamp}][{self.message_id}] "
+                                "No reply from Harmony in 30s. "
+                                f"Retrying {try_index}"))
                 try_index += 1
                 current_time = time.time()
             if try_index > 30:
                 break
             try:
                 result = self.queue[request["message_id"]]
-                self.log.debug(("  - got request id {}, "
-                                "removing from queue").format(
-                                    request["message_id"]))
+                timestamp = datetime.now().strftime("%H:%M:%S.%f")
+                self.log.debug((f"[{timestamp}] Got request "
+                                f"id {self.message_id}, "
+                                "removing from queue"))
                 del self.queue[request["message_id"]]
                 break
             except KeyError:
@@ -228,3 +238,8 @@ class Server(object):
         self.received = ""
 
         return result
+
+    def _pretty(self, message) -> str:
+        # result = pformat(message, indent=2)
+        # return result.replace("\\n", "\n")
+        return "{}{}".format(4 * " ", message)
