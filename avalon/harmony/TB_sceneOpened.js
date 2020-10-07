@@ -345,8 +345,8 @@ function start() {
   app.avalon_on_file_changed = true;
   */
   app.on_file_changed = function(path) {
-
-  }
+    // empty stub
+  };
 }
 
 function TB_sceneOpened()
