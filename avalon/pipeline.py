@@ -54,7 +54,7 @@ HOST_WORKFILE_EXTENSIONS = {
     "houdini": [".hip", ".hiplc", ".hipnc"],
     "maya": [".ma", ".mb"],
     "nuke": [".nk"],
-    "nukestudio": [".hrox"],
+    "hiero": [".hrox"],
     "photoshop": [".psd"],
     "premiere": [".prproj"],
     "resolve": [".drp"]
