@@ -25,8 +25,17 @@ def ls():
         dict: container
 
     """
-    for layer in lib.get_layers_in_document():
-        data = lib.read(layer)
+    try:
+        stub = lib.stub()  # only after Photoshop is up
+    except lib.ConnectionNotEstablishedYet:
+        print("Not connected yet, ignoring")
+        return
+
+    if not stub.get_active_document_name():
+        return
+
+    for layer in stub.get_layers():
+        data = stub.read(layer)
 
         # Skip non-tagged layers.
         if not data:
@@ -53,7 +62,8 @@ class Creator(api.Creator):
         # Photoshop can have multiple LayerSets with the same name, which does
         # not work with Avalon.
         msg = "Instance with name \"{}\" already exists.".format(self.name)
-        for layer in lib.get_layers_in_document():
+        stub = lib.stub()  # only after Photoshop is up
+        for layer in stub.get_layers():
             if self.name.lower() == layer.Name.lower():
                 msg = Qt.QtWidgets.QMessageBox()
                 msg.setIcon(Qt.QtWidgets.QMessageBox.Warning)
@@ -67,14 +77,11 @@ class Creator(api.Creator):
 
             # Add selection to group.
             if (self.options or {}).get("useSelection"):
-                group = lib.group_selected_layers()
+                group = stub.group_selected_layers(self.name)
             else:
-                group = lib.app().ActiveDocument.LayerSets.Add()
+                group = stub.create_group(self.name)
 
-            # Create group/layer relationship.
-            group.Name = self.name
-
-            lib.imprint(group, self.data)
+            stub.imprint(group, self.data)
 
         return group
 
@@ -93,7 +100,7 @@ def containerise(name,
     Arguments:
         name (str): Name of resulting assembly
         namespace (str): Namespace under which to host container
-        layer (COMObject): Layer to containerise
+        layer (Layer): Layer to containerise
         context (dict): Asset information
         loader (str, optional): Name of loader used to produce this container.
         suffix (str, optional): Suffix of container, defaults to `_CON`.
@@ -101,7 +108,7 @@ def containerise(name,
     Returns:
         container (str): Name of container assembly
     """
-    layer.Name = name + suffix
+    layer.name = name + suffix
 
     data = {
         "schema": "avalon-core:container-2.0",
@@ -111,7 +118,7 @@ def containerise(name,
         "loader": str(loader),
         "representation": str(context["representation"]["_id"]),
     }
-
-    lib.imprint(layer, data)
+    stub = lib.stub()
+    stub.imprint(layer, data)
 
     return layer
