@@ -388,7 +388,18 @@ class Window(QtWidgets.QDialog):
             self.echo("Grouping not enabled.")
             return
 
-        selected = subsets.selected_subsets()
+        selected = []
+        merged_items = []
+        for item in subsets.selected_subsets(_merged=True):
+            if item.get("isMerged"):
+                merged_items.append(item)
+            else:
+                selected.append(item)
+
+        for merged_item in merged_items:
+            for child_item in merged_item.children():
+                selected.append(child_item)
+
         if not selected:
             self.echo("No selected subset.")
             return
