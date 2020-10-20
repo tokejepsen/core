@@ -3,7 +3,6 @@ import sys
 import time
 import subprocess
 import asyncio
-import importlib
 import socket
 import functools
 import threading
@@ -157,43 +156,23 @@ class WebsocketServerThread(threading.Thread):
         ]
         list(map(lambda task: task.cancel(), tasks))  # cancel all the tasks
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        log.debug(f'Finished awaiting cancelled tasks, results: {results}...')
+        log.debug(f"Finished awaiting cancelled tasks, results: {results}...")
         await self.loop.shutdown_asyncgens()
         # to really make sure everything else has time to stop
         await asyncio.sleep(0.07)
         self.loop.stop()
 
 
-class ConnectionNotEstablishedYet(Exception):
-    pass
-
-
 class TVPaintServerStub:
-    """
-        Stub for calling function on client (Photoshop js) side.
-        Expects that client is already connected (started when avalon menu
-        is opened).
-        'self.websocketserver.call' is used as async wrapper
-    """
-
     def __init__(self, websocketserver, client):
         self.websocketserver = websocketserver
         self.client = client
-
-    def __bool__(self):
-        return bool(self.client)
 
     def close(self):
         self.client.close()
 
 
 class TVPaintRoute(WebSocketRoute):
-    """
-        One route, mimicking external application (like Harmony, etc).
-        All functions could be called from client.
-        'do_notify' function calls function on the client - mimicking
-            notification after long running job on the server or similar
-    """
     instance = None
     communication_obj = None
 
@@ -246,10 +225,6 @@ class Communicator:
         return self.callback_queue.get()
 
     def launch(self, host_executable):
-        """Starts the websocket server that will be hosted
-           in the Photoshop extension.
-        """
-
         log.info("Installing TVPaint implementation")
         api.install(tvpaint)
 
