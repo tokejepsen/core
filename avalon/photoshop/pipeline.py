@@ -35,8 +35,9 @@ def ls():
     if not stub.get_active_document_name():
         return
 
+    layers_meta = stub.get_layers_metadata()  # minimalize calls to PS
     for layer in stub.get_layers():
-        data = stub.read(layer)
+        data = stub.read(layer, layers_meta)
 
         # Skip non-tagged layers.
         if not data:

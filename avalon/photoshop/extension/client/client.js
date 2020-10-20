@@ -162,9 +162,10 @@
       });
       
       RPC.addRoute('Photoshop.import_smart_object', function (data) {
-              log.warn('Server called client route "import_smart_object":', data);
+              log.warn('Server called client "import_smart_object":', data);
               var escapedPath = EscapeStringForJSX(data.path);
-              return runEvalScript("importSmartObject('" + escapedPath +"')")
+              return runEvalScript("importSmartObject('" + escapedPath +"', " +
+                                                      "'"+ data.name +"')")
                   .then(function(result){
                       log.warn("import_smart_object: " + result);
                       return result;
@@ -174,10 +175,20 @@
       RPC.addRoute('Photoshop.replace_smart_object', function (data) {
               log.warn('Server called route "replace_smart_object":', data);
               var escapedPath = EscapeStringForJSX(data.path);
-              return runEvalScript("replaceSmartObjects('" + data.layer + "'," +
-                                                        "'" + escapedPath +"')")
+              return runEvalScript("replaceSmartObjects("+data.layer_id+"," +
+                                                        "'" + escapedPath +"',"+
+                                                        "'"+ data.name +"')")
                   .then(function(result){
                       log.warn("replaceSmartObjects: " + result);
+                      return result;
+                  });
+      });
+      
+      RPC.addRoute('Photoshop.delete_layer', function (data) {
+              log.warn('Server called route "delete_layer":', data);
+              return runEvalScript("deleteLayer("+data.layer_id+")")
+                  .then(function(result){
+                      log.warn("delete_layer: " + result);
                       return result;
                   });
       });
