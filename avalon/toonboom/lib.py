@@ -30,7 +30,7 @@ self.application_name = None
 self.log = logging.getLogger(__name__)
 self.log.setLevel(logging.DEBUG)
 
-signature = str(uuid4())
+signature = str(uuid4()).replace("-", "_")
 
 
 def execute_in_main_thread(func_to_call_from_main_thread):

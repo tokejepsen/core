@@ -42,14 +42,14 @@ def save_file(filepath):
     lib.zip_and_move(temp_path, filepath)
 
     lib.workfile_path = filepath
-
-    func = """function add_path(path)
+    sig = lib.signature("add_path")
+    func = """function %s(path)
     {
         var app = QCoreApplication.instance();
         app.watcher.addPath(path);
     }
-    add_path
-    """
+    %s
+    """ % (sig, sig)
 
     scene_path = os.path.join(
         temp_path, os.path.basename(temp_path) + ".xstage"

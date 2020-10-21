@@ -48,12 +48,13 @@ AVALON_CONTAINER_ID = "pyblish.avalon.container"
 HOST_WORKFILE_EXTENSIONS = {
     "blender": [".blend"],
     "celaction": [".scn"],
+    "tvpaint": [".tvpp"],
     "fusion": [".comp"],
     "harmony": [".zip"],
     "houdini": [".hip", ".hiplc", ".hipnc"],
     "maya": [".ma", ".mb"],
     "nuke": [".nk"],
-    "nukestudio": [".hrox"],
+    "hiero": [".hrox"],
     "photoshop": [".psd"],
     "premiere": [".prproj"],
     "resolve": [".drp"]

@@ -112,10 +112,10 @@ class TreeModel(QtCore.QAbstractItemModel):
 
         return self.createIndex(parent_item.row(), 0, parent_item)
 
-    def index(self, row, column, parent):
+    def index(self, row, column, parent=None):
         """Return index for row/column under parent"""
 
-        if not parent.isValid():
+        if parent is None or not parent.isValid():
             parent_item = self._root_item
         else:
             parent_item = parent.internalPointer()
@@ -189,6 +189,7 @@ class Item(dict):
         if self._parent is not None:
             siblings = self.parent().children()
             return siblings.index(self)
+        return -1
 
     def add_child(self, child):
         """Add a child to this item"""
