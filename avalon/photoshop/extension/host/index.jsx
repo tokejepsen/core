@@ -303,9 +303,12 @@ function groupSelectedLayers(doc, name) {
     return JSON.stringify(layer);        
 };
 
-function importSmartObject(path){
+function importSmartObject(path, name){
     /**
      *  Creates new layer with an image from 'path'
+     *  
+     *      path: absolute path to loaded file
+     *      name: sets name of newly created laye
      *  
      **/
     var desc1 = new ActionDescriptor();
@@ -324,30 +327,35 @@ function importSmartObject(path){
     
     var docRef =  app.activeDocument
     var currentActivelayer = app.activeDocument.activeLayer;
-    
+    if (name){
+        currentActivelayer.name = name;
+    }
     var layer = {}
     layer.id = currentActivelayer.id;
     layer.name = currentActivelayer.name;                        
     return JSON.stringify(layer);     
 }
 
-function replaceSmartObjects(layer, path){
+function replaceSmartObjects(layer_id, path, name){
     /**
      *  Updates content of 'layer' with an image from 'path'
      *  
-     **/
-    layer = JSON.parse(layer);
-    
+     **/    
     var desc = new ActionDescriptor();
     
     var ref = new ActionReference();
-    ref.putIdentifier(stringIDToTypeID("layer"), layer.id);
+    ref.putIdentifier(stringIDToTypeID("layer"), layer_id);
     desc.putReference(stringIDToTypeID("null"), ref);
     
     desc.putPath(charIDToTypeID('null'), new File(path) );
     desc.putInteger(charIDToTypeID("PgNm"), 1);
     executeAction(stringIDToTypeID('placedLayerReplaceContents'), 
                   desc, DialogModes.NO );
+                  
+    var currentActivelayer = app.activeDocument.activeLayer;
+    if (name){
+        currentActivelayer.name = name;
+    }                  
 }
 
 function createGroup(name){
@@ -361,12 +369,26 @@ function createGroup(name){
     return group.id;  // only id available at this time :|
 }
 
+function deleteLayer(layer_id){          
+    /***
+     * Deletes layer by its layer_id
+     * 
+     * layer_id (int)
+     **/
+    var d = new ActionDescriptor();
+    var r = new ActionReference();
+
+    r.putIdentifier(stringIDToTypeID("layer"), layer_id);
+    d.putReference(stringIDToTypeID("null"), r);
+    executeAction(stringIDToTypeID("delete"), d, DialogModes.NO);
+}
+
 function _undo() {
     executeAction(charIDToTypeID("undo", undefined, DialogModes.NO));
 };
 
 
-// triggers when panel is opened, good for debugging
+// triggers when panel is opened, good for debugging 
 //log(getActiveDocumentName()); 
 //log.show();
 

@@ -242,7 +242,10 @@ class ImageLoader(api.Loader):
     def switch(self, container, representation):
         self.update(container, representation)
 ```
-
+For easier debugging of Javascript:
+https://community.adobe.com/t5/download-install/adobe-extension-debuger-problem/td-p/10911704?page=1
+Add --enable-blink-features=ShadowDOMV0,CustomElementsV0 when starting Chrome
+then localhost:
 ## Resources
   - https://github.com/lohriialo/photoshop-scripting-python
   - https://www.adobe.com/devnet/photoshop/scripting.html

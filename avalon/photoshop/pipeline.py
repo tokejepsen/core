@@ -1,6 +1,7 @@
 from .. import api, pipeline
 from . import lib
 from ..vendor import Qt
+from collections import namedtuple
 
 import pyblish.api
 
@@ -34,8 +35,9 @@ def ls():
     if not stub.get_active_document_name():
         return
 
+    layers_meta = stub.get_layers_metadata()  # minimalize calls to PS
     for layer in stub.get_layers():
-        data = stub.read(layer)
+        data = stub.read(layer, layers_meta)
 
         # Skip non-tagged layers.
         if not data:
@@ -108,7 +110,11 @@ def containerise(name,
     Returns:
         container (str): Name of container assembly
     """
-    layer.name = name + suffix
+    # layer is namedtuple - immutable - need to change to dict and back
+    # refactor to proper object
+    layer = layer._asdict()
+    layer["name"] = name + suffix
+    layer = namedtuple('Layer', layer.keys())(*layer.values())
 
     data = {
         "schema": "avalon-core:container-2.0",
