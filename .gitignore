@@ -12,3 +12,4 @@ _site
 build
 *.patch
 *.diff
+Thumbs.db
