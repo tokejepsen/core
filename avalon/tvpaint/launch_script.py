@@ -4,7 +4,8 @@ import time
 import traceback
 
 from avalon import style
-from avalon.tvpaint import pipeline, communication_server
+from avalon.tvpaint import pipeline
+from avalon.tvpaint.communication_server import CommunicatorWrapper
 from avalon.vendor.Qt import QtWidgets, QtCore
 
 from pype.api import Logger
@@ -85,14 +86,10 @@ def main(app_executable, debug=False):
     qt_app.setQuitOnLastWindowClosed(False)
     qt_app.setStyleSheet(style.load_stylesheet())
 
-    # Create any Qt window to keep QtApplicaiton alive if none of other
-    # tools are shown
-    # _main_window = MainWindow(qt_app)
-
     # Execute pipeline installation
     pipeline.install()
 
-    communicator = communication_server.Communicator(qt_app, DEBUG_MODE)
+    communicator = CommunicatorWrapper.create_communicator(qt_app, DEBUG_MODE)
     communicator.launch(app_executable)
 
     main_thread_executor = MainThreadChecker(communicator)
