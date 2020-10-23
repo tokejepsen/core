@@ -256,7 +256,7 @@ class Communicator:
             if not self.debug_mode and self.process.poll() is not None:
                 log.debug("Host process is not alive. Exiting")
                 self.websocket_server.stop()
-                self.qt_app.close()
+                self.qt_app.quit()
                 return
             try:
                 client = self.websocket_server.get_client()
