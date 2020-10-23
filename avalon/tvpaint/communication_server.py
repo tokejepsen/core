@@ -156,42 +156,36 @@ class WebsocketServerThread(threading.Thread):
         self.loop.stop()
 
 
-class TVPaintServerStub:
-    def __init__(self, websocketserver, client):
-        self.websocketserver = websocketserver
-        self.client = client
+class TVPaintRpc(JsonRpc):
+    def __init__(self, communication_obj, route_name=""):
+        super().__init__()
+        self.route_name = route_name
+        self.communication_obj = communication_obj
+        # Register methods
+        self.add_methods(
+            (route_name, self.workfiles_route)
+        )
 
-    def close(self):
-        self.client.close()
+    def client_connected(self):
+        # TODO This is poor check. Add check it is client from TVPaint
+        if self.clients:
+            return True
+        return False
 
-
-class TVPaintRoute(WebSocketRoute):
-    instance = None
-    communication_obj = None
-
-    @classmethod
-    def set_communication_obj(cls, communication_obj):
-        cls.communication_obj = communication_obj
-
-    def init(self, **kwargs):
-        # Python __init__ must be return "self".
-        # This method might return anything.
-        log.debug("someone called Photoshop route")
-        self.instance = self
-        return kwargs
-
-    # server functions
-    async def ping(self):
-        log.debug("someone called Photoshop route ping")
-
-    # panel routes for tools
+    # Panel routes for tools
     async def workfiles_route(self):
         log.info("Triggering Workfile tool")
-        self._execute_in_main_thread(workfiles.show)
+        item = MainThreadItem(workfiles.show)
+        result = self._execute_in_main_thread(item)
+        return result
 
-    def _execute_in_main_thread(self, func, *args, **kwargs):
-        partial_method = functools.partial(func, *args, **kwargs)
-        self.communication_obj.execute_in_main_thread(partial_method)
+    def _execute_in_main_thread(self, item):
+        return self.communication_obj.execute_in_main_thread(item)
+
+
+
+
+
 
 
 class Communicator:
