@@ -14,7 +14,7 @@ def open_file(filepath):
     return None
 
 
-def save_file(filepath, copy):
+def save_file(filepath):
     """Save the open scene file."""
     return None
 
