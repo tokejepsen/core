@@ -183,9 +183,32 @@ class TVPaintRpc(JsonRpc):
         return self.communication_obj.execute_in_main_thread(item)
 
 
+class MainThreadItem:
+    not_set = object()
+    sleep_time = 0.1
 
+    def __init__(self, callback, *args, **kwargs):
+        self.done = False
+        self.exc_info = self.not_set
+        self.result = self.not_set
+        self.callback = callback
+        self.args = args
+        self.kwargs = kwargs
 
+    def handle_result(self):
+        if self.exc_info is self.not_set:
+            return self.result
+        raise self.exc_info
 
+    def wait(self):
+        while not self.done:
+            time.sleep(self.sleep_time)
+        return self.handle_result()
+
+    async def asyncio_wait(self):
+        while not self.done:
+            await asyncio.sleep(self.sleep_time)
+        return self.handle_result()
 
 
 class Communicator:
