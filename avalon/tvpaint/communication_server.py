@@ -19,6 +19,64 @@ from aiohttp_json_rpc import JsonRpc
 log = Logger().get_logger(__name__)
 
 
+class CommunicatorWrapper:
+    # TODO add logs and exceptions
+    communicator = None
+    _connected_client = None
+
+    @classmethod
+    def create_communicator(cls, *args, **kwargs):
+        if not cls.communicator:
+            cls.communicator = Communicator(*args, **kwargs)
+        return cls.communicator
+
+    @classmethod
+    def _client(cls):
+        if not cls.communicator:
+            log.warning("Communicator object was not created yet.")
+            return None
+
+        if not cls.communicator.websocket_rpc:
+            log.warning("Communicator's server did not start yet.")
+            return None
+
+        for client in cls.communicator.websocket_rpc.clients:
+            if not client.ws.closed:
+                return client
+        log.warning("Client is not yet connected to Communicator.")
+        return None
+
+    @classmethod
+    def client(cls):
+        if not cls._connected_client or cls._connected_client.ws.closed:
+            cls._connected_client = cls._client()
+        return cls._connected_client
+
+    @classmethod
+    def send_request(cls, method, params=[], client=None):
+        if client is None:
+            client = cls.client()
+
+        if not client:
+            return
+
+        return cls.communicator.websocket_rpc.send_request(
+            client, method, params
+        )
+
+    @classmethod
+    def send_notification(cls, method, params=[], client=None):
+        if client is None:
+            client = cls.client()
+
+        if not client:
+            return
+
+        cls.communicator.websocket_rpc.send_notification(
+            client, method, params
+        )
+
+
 class WebSocketServer:
     def __init__(self):
         self.client = None
