@@ -349,18 +349,17 @@ function start() {
   };
 }
 
-function ensure_scene_settings(args)
-{
+function ensureSceneSettings() {
   var app = QCoreApplication.instance();
-
-  app.avalon_client.send({
-      "module": "pype.harmony",
+  app.avalon_client.send(
+    {
+      "module": "pype.hosts.harmony",
       "method": "ensure_scene_settings",
       "args": []
-    }, false);
-
+    },
+    false
+  );
 }
-
 
 function TB_sceneOpened()
 {
