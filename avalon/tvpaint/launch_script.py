@@ -48,16 +48,33 @@ class MainThreadChecker(QtCore.QThread):
     def run(self):
         self.is_running = True
         while self.is_running:
-            callback = self.communicator.main_thread_listen()
-            if callback:
-                self.to_execute.emit(callback)
+            item = self.communicator.main_thread_listen()
+            if item:
+                self.to_execute.emit(item)
             else:
                 time.sleep(0.2)
 
 
-def process_in_main_thread(callback):
+def process_in_main_thread(main_thread_item):
+    log.info("Process in main thread")
+    if main_thread_item.done:
+        log.info("Item is done")
+        return
+
+    callback = main_thread_item.callback
+    args = main_thread_item.args
+    kwargs = main_thread_item.kwargs
     log.info("Running callback: {}".format(str(callback)))
-    callback()
+    try:
+        result = callback(*args, **kwargs)
+        main_thread_item.result = result
+
+    except Exception:
+        main_thread_item.exc_info = sys.exc_info()
+
+    finally:
+        main_thread_item.done = True
+
 
 def main(app_executable, debug=False):
     global DEBUG_MODE
