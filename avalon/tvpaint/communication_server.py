@@ -258,17 +258,12 @@ class Communicator:
                 self.websocket_server.stop()
                 self.qt_app.quit()
                 return
-            try:
-                client = self.websocket_server.get_client()
-                if client:
-                    self.stub = TVPaintServerStub(
-                        self.websocket_server, client
-                    )
-                    break
 
-            except Exception:
-                log.debug("Client not conencted yet")
-                time.sleep(0.2)
+            if self.websocket_rpc.client_connected():
+                break
 
-        log.info("Stub has connected")
+            log.debug("Client not connected yet")
+            time.sleep(0.2)
+
+        log.info("Client has connected")
         api.emit("application.launched")
