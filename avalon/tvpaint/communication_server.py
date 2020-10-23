@@ -23,14 +23,16 @@ class WebSocketServer:
     def __init__(self):
         self.client = None
 
-        self.app = web.Application()
-
+        self.loop = asyncio.new_event_loop()
+        self.app = web.Application(loop=self.loop)
         self.port = self.find_free_port()
-        self.websocket_thread = WebsocketServerThread(self, self.port)
+        self.websocket_thread = WebsocketServerThread(
+            self, self.port, loop=self.loop
+        )
 
     @property
-    def loop(self):
-        return self.websocket_thread.loop
+    def server_is_running(self):
+        return self.websocket_thread.server_is_running
 
     def add_route(self, *args, **kwargs):
         self.app.router.add_route(*args, **kwargs)
@@ -48,7 +50,7 @@ class WebSocketServer:
     def call(self, func):
         log.debug("websocket.call {}".format(func))
         future = asyncio.run_coroutine_threadsafe(
-            func, self.websocket_thread.loop
+            func, self.loop
         )
         result = future.result()
         return result
@@ -75,12 +77,13 @@ class WebsocketServerThread(threading.Thread):
         example Harmony needs to run something on main thread), but currently
         it creates separate thread and separate asyncio event loop
     """
-    def __init__(self, module, port):
+    def __init__(self, module, port, loop):
         super(WebsocketServerThread, self).__init__()
         self.is_running = False
+        self.server_is_running = False
         self.port = port
         self.module = module
-        self.loop = None
+        self.loop = loop
         self.runner = None
         self.site = None
         self.tasks = []
@@ -90,8 +93,6 @@ class WebsocketServerThread(threading.Thread):
 
         try:
             log.info("Starting websocket server")
-            self.loop = asyncio.new_event_loop()  # create new loop for thread
-            asyncio.set_event_loop(self.loop)
 
             self.loop.run_until_complete(self.start_server())
 
@@ -101,12 +102,16 @@ class WebsocketServerThread(threading.Thread):
             )
 
             asyncio.ensure_future(self.check_shutdown(), loop=self.loop)
+
+            self.server_is_running = True
             self.loop.run_forever()
+
         except Exception:
             log.warning(
                 "Websocket Server service has failed", exc_info=True
             )
         finally:
+            self.server_is_running = False
             # optional
             self.loop.close()
 
@@ -156,8 +161,8 @@ class WebsocketServerThread(threading.Thread):
 
 
 class TVPaintRpc(JsonRpc):
-    def __init__(self, communication_obj, route_name=""):
-        super().__init__()
+    def __init__(self, communication_obj, route_name="", **kwargs):
+        super().__init__(**kwargs)
         self.route_name = route_name
         self.communication_obj = communication_obj
         # Register methods
@@ -242,20 +247,12 @@ class Communicator:
 
         # Launch TVPaint and the websocket server.
         log.info("Launching TVPaint")
-        self.websocket_rpc = TVPaintRpc(self)
         self.websocket_server = WebSocketServer()
+        self.websocket_rpc = TVPaintRpc(self, loop=self.websocket_server.loop)
 
         os.environ["WEBSOCKET_URL"] = "ws://localhost:{}".format(
             self.websocket_server.port
         )
-        if not self.debug_mode:
-            self.process = subprocess.Popen(
-                host_executable,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=os.environ
-            )
-
         self.websocket_server.add_route(
             "*", "/", self.websocket_rpc.handle_request
         )
@@ -265,9 +262,17 @@ class Communicator:
 
         self.websocket_server.start()
         # Make sure RPC is using same loop as websocket server
-        while self.websocket_server.loop is None:
+        while not self.websocket_server.server_is_running:
             time.sleep(0.1)
-        self.websocket_rpc.loop = self.websocket_server.loop
+
+        # Start TVPaint when server is running
+        if not self.debug_mode:
+            self.process = subprocess.Popen(
+                host_executable,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=os.environ
+            )
 
         log.info("Waiting for client connection")
         while True:
