@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import time
 import subprocess
 import collections
@@ -235,18 +236,18 @@ class TVPaintRpc(JsonRpc):
         remote = http_request.remote
         if remote in self.waiting_requests:
             try:
-                msg = decode_msg(raw_msg.data)
+                _raw_message = raw_msg.data
+                msg = decode_msg(_raw_message)
 
             except RpcError as error:
                 await self._ws_send_str(http_request, encode_error(error))
                 return
 
-            if (
-                msg.type == JsonRpcMsgTyp.RESULT
-                and msg.data["id"] in self.waiting_requests[remote]
-            ):
-                self.responses[remote].append(msg)
-                return
+            if msg.type in (JsonRpcMsgTyp.RESULT, JsonRpcMsgTyp.ERROR):
+                msg_data = json.loads(_raw_message)
+                if msg_data.get("id") in self.waiting_requests[remote]:
+                    self.responses[remote].append(msg_data)
+                    return
 
         return await super()._handle_rpc_msg(http_request, raw_msg)
 
