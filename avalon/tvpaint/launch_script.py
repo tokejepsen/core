@@ -3,6 +3,7 @@ import signal
 import time
 import traceback
 
+from avalon import style
 from avalon.tvpaint import pipeline, communication_server
 from avalon.vendor.Qt import QtWidgets, QtCore
 
@@ -85,6 +86,7 @@ def main(app_executable, debug=False):
     # Create QtApplication for tools
     qt_app = QtWidgets.QApplication([])
     qt_app.setQuitOnLastWindowClosed(False)
+    qt_app.setStyleSheet(style.load_stylesheet())
 
     # Create any Qt window to keep QtApplicaiton alive if none of other
     # tools are shown
