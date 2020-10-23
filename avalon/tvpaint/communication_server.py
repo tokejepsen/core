@@ -266,16 +266,22 @@ class TVPaintRpc(JsonRpc):
         return self.communication_obj.execute_in_main_thread(item)
 
     def send_notification(self, client, method, params=[]):
-        client.ws.send_str(encode_request(method, params=params))
+        future = asyncio.run_coroutine_threadsafe(
+            client.ws.send_str(encode_request(method, params=params)),
+            loop=self.loop
+        )
+        result = future.result()
 
     def send_request(self, client, method, params=[]):
         client_remote = client.remote
         request_id = self.requests_ids[client_remote]
         self.requests_ids[client_remote] += 1
         self.waiting_requests[client_remote].append(request_id)
-        self.loop.create_task(
-            client.ws.send_str(encode_request(method, request_id, params))
+        future = asyncio.run_coroutine_threadsafe(
+            client.ws.send_str(encode_request(method, request_id, params)),
+            loop=self.loop
         )
+        result = future.result()
 
         response = None
         while True:
