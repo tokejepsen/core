@@ -10,6 +10,8 @@ from pype.api import Logger
 
 log = Logger().get_logger(__name__)
 
+DEBUG_MODE = False
+
 
 def safe_excepthook(*args):
     traceback.print_exception(*args)
@@ -57,8 +59,10 @@ def process_in_main_thread(callback):
     log.info("Running callback: {}".format(str(callback)))
     callback()
 
+def main(app_executable, debug=False):
+    global DEBUG_MODE
+    DEBUG_MODE = debug
 
-def main(app_executable):
     sys.excepthook = safe_excepthook
 
     # Create QtApplication for tools
@@ -72,16 +76,16 @@ def main(app_executable):
     # Execute pipeline installation
     pipeline.install()
 
-    communicator = communication_server.Communicator(qt_app)
+    communicator = communication_server.Communicator(qt_app, DEBUG_MODE)
     communicator.launch(app_executable)
 
     main_thread_executor = MainThreadChecker(communicator)
     main_thread_executor.to_execute.connect(process_in_main_thread)
-
-    porcess_alive_checker = ProcessAliveChecker(communicator, qt_app)
-
-    porcess_alive_checker.start()
     main_thread_executor.start()
+
+    if not DEBUG_MODE:
+        porcess_alive_checker = ProcessAliveChecker(communicator, qt_app)
+        porcess_alive_checker.start()
 
     # Register terminal signal handler
     def signal_handler(*args):
@@ -97,4 +101,9 @@ def main(app_executable):
 
 
 if __name__ == "__main__":
-    main()
+    debug_mode = "debug" in sys.argv
+    executable_path = None
+    if not debug_mode:
+        executable_path = sys.argv[0]
+
+    main(executable_path, debug_mode)

@@ -202,7 +202,9 @@ class TVPaintRoute(WebSocketRoute):
 
 
 class Communicator:
-    def __init__(self, qt_app):
+    def __init__(self, qt_app, debug_mode=False):
+        self.debug_mode = debug_mode
+
         self.callback_queue = Queue()
         self.qt_app = qt_app
 
@@ -241,7 +243,7 @@ class Communicator:
 
         log.info("Waiting for client connection")
         while True:
-            if self.process.poll() is not None:
+            if not self.debug_mode and self.process.poll() is not None:
                 log.debug("Host process is not alive. Exiting")
                 self.websocket_server.stop()
                 self.qt_app.close()
