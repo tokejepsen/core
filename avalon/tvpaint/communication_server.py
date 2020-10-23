@@ -9,12 +9,13 @@ import threading
 from queue import Queue
 from contextlib import closing
 
-from aiohttp import web
-from wsrpc_aiohttp import WebSocketRoute, WebSocketAsync
 
 from ..tools import workfiles
 from avalon import api, tvpaint
 from pype.api import Logger
+
+from aiohttp import web
+from aiohttp_json_rpc import JsonRpc
 
 log = Logger().get_logger(__name__)
 
@@ -24,10 +25,16 @@ class WebSocketServer:
         self.client = None
 
         self.app = web.Application()
-        self.app.router.add_route("*", "/", WebSocketAsync)
 
         self.port = self.find_free_port()
         self.websocket_thread = WebsocketServerThread(self, self.port)
+
+    @property
+    def loop(self):
+        return self.websocket_thread.loop
+
+    def add_route(self, *args, **kwargs):
+        self.app.router.add_route(*args, **kwargs)
 
     @staticmethod
     def find_free_port():
@@ -46,20 +53,6 @@ class WebSocketServer:
         )
         result = future.result()
         return result
-
-    def get_client(self):
-        """
-            Return first connected client to WebSocket
-            TODO implement selection by Route
-        :return: <WebSocketAsync> client
-        """
-        clients = WebSocketAsync.get_clients()
-        client = None
-        if len(clients) > 0:
-            key = list(clients.keys())[0]
-            client = clients.get(key)
-
-        return client
 
     def start(self):
         self.websocket_thread.start()
