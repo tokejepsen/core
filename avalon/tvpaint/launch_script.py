@@ -3,7 +3,7 @@ import signal
 import time
 import traceback
 
-from . import pipeline, communication_server
+from avalon.tvpaint import pipeline, communication_server
 from avalon.vendor.Qt import QtWidgets, QtCore
 
 from pype.api import Logger
