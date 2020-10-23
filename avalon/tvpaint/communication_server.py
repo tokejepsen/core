@@ -274,34 +274,48 @@ class TVPaintRpc(JsonRpc):
         )
         result = future.result()
 
-    def send_request(self, client, method, params=[]):
+    def send_request(self, client, method, params=[], timeout=0):
         client_remote = client.remote
+
         request_id = self.requests_ids[client_remote]
         self.requests_ids[client_remote] += 1
+
         self.waiting_requests[client_remote].append(request_id)
+
+        log.debug("Sending request to client {} ({}, {}) id: {}".format(
+            client_remote, method, params, request_id
+        ))
         future = asyncio.run_coroutine_threadsafe(
             client.ws.send_str(encode_request(method, request_id, params)),
             loop=self.loop
         )
         result = future.result()
 
-        response = None
+        not_found = object()
+        response = not_found
+        start = time.time()
         while True:
-            # TODO raise exception?
             if client.ws.closed:
                 return None
 
             for _response in self.responses[client_remote]:
-                _id = _response.data.get("id")
+                _id = _response.get("id")
                 if _id == request_id:
                     response = _response
                     break
 
-        if response is None:
+            if response is not not_found:
+                break
+
+            if timeout > 0 and (time.time() - start) > timeout:
+                raise Exception("Timeout passed")
+                return
+
+        if response is not_found:
             raise Exception("Connection closed")
 
-        error = response.data.get("error")
-        result = response.data.get("result")
+        error = response.get("error")
+        result = response.get("result")
         if error:
             raise Exception("Error happened: {}".format(error))
         return result
