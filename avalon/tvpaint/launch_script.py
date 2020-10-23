@@ -1,12 +1,16 @@
+import os
 import sys
 import signal
 import time
 import traceback
+import ctypes
+import platform
 
+import avalon
 from avalon import style
 from avalon.tvpaint import pipeline
 from avalon.tvpaint.communication_server import CommunicatorWrapper
-from avalon.vendor.Qt import QtWidgets, QtCore
+from avalon.vendor.Qt import QtWidgets, QtCore, QtGui
 
 from pype.api import Logger
 
@@ -33,6 +37,7 @@ class ProcessAliveChecker(QtCore.QThread):
 
     def run(self):
         self.communicator.process.wait()
+        log.info("Host process ended.")
         self.communicator.stop()
 
 
@@ -75,6 +80,18 @@ def process_in_main_thread(main_thread_item):
         main_thread_item.done = True
 
 
+def avalon_icon_path():
+    avalon_repo = os.path.dirname(
+        os.path.dirname(os.path.abspath(avalon.__file__))
+    )
+    full_path = os.path.join(
+        avalon_repo, "res", "icons", "png", "avalon-logo-128.png"
+    )
+    if os.path.exists(full_path):
+        return full_path
+    return None
+
+
 def main(app_executable, debug=False):
     global DEBUG_MODE
     DEBUG_MODE = debug
@@ -85,6 +102,15 @@ def main(app_executable, debug=False):
     qt_app = QtWidgets.QApplication([])
     qt_app.setQuitOnLastWindowClosed(False)
     qt_app.setStyleSheet(style.load_stylesheet())
+
+    if platform.system().lower() == "windows":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            u"WebsocketServer"
+        )
+    icon_path = avalon_icon_path()
+    if icon_path:
+        icon = QtGui.QIcon(icon_path)
+        qt_app.setWindowIcon(icon)
 
     # Execute pipeline installation
     pipeline.install()
