@@ -4,7 +4,6 @@ import time
 import subprocess
 import asyncio
 import socket
-import functools
 import threading
 from queue import Queue
 from contextlib import closing
@@ -219,16 +218,17 @@ class Communicator:
         self.qt_app = qt_app
 
         self.process = None
-        self.stub = None
         self.websocket_route = None
         self.websocket_server = None
+        self.websocket_rpc = None
 
-    def execute_in_main_thread(self, func_to_call_from_main_thread):
-        self.callback_queue.put(func_to_call_from_main_thread)
+    def execute_in_main_thread(self, main_thread_item):
+        self.callback_queue.put(main_thread_item)
+        return main_thread_item.wait()
 
     def main_thread_listen(self):
         # check if host still running
-        if self.process.poll() is not None:
+        if not self.debug_mode and self.process.poll() is not None:
             self.websocket_server.stop()
             return self.qt_app.quit()
 
@@ -242,14 +242,32 @@ class Communicator:
 
         # Launch TVPaint and the websocket server.
         log.info("Launching TVPaint")
-        self.process = subprocess.Popen(
-            host_executable, stdout=subprocess.PIPE, stderr=subprocess.PIPE
-        )
-
+        self.websocket_rpc = TVPaintRpc(self)
         self.websocket_server = WebSocketServer()
-        TVPaintRoute.set_communication_obj(self)
-        WebSocketAsync.add_route(TVPaintRoute.__name__, TVPaintRoute)
-        self.websocket_server.websocket_thread.start()
+
+        os.environ["WEBSOCKET_URL"] = "ws://localhost:{}".format(
+            self.websocket_server.port
+        )
+        if not self.debug_mode:
+            self.process = subprocess.Popen(
+                host_executable,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=os.environ
+            )
+
+        self.websocket_server.add_route(
+            "*", "/", self.websocket_rpc.handle_request
+        )
+        log.info("Added request handler for url: {}".format(
+            os.environ["WEBSOCKET_URL"]
+        ))
+
+        self.websocket_server.start()
+        # Make sure RPC is using same loop as websocket server
+        while self.websocket_server.loop is None:
+            time.sleep(0.1)
+        self.websocket_rpc.loop = self.websocket_server.loop
 
         log.info("Waiting for client connection")
         while True:
