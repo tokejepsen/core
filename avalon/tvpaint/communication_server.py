@@ -278,12 +278,12 @@ class Communicator:
                 return
 
             if self.websocket_rpc.client_connected():
+                log.info("Client has connected")
                 break
 
             log.debug("Client not connected yet")
             time.sleep(0.2)
 
-        log.info("Client has connected")
         api.emit("application.launched")
 
     def stop(self):
