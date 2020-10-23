@@ -15,6 +15,10 @@ from pype.api import Logger
 
 from aiohttp import web
 from aiohttp_json_rpc import JsonRpc
+from aiohttp_json_rpc.protocol import (
+    encode_request, encode_error, decode_msg, JsonRpcMsgTyp
+)
+from aiohttp_json_rpc.exceptions import RpcError
 
 log = Logger().get_logger(__name__)
 
@@ -213,12 +217,37 @@ class WebsocketServerThread(threading.Thread):
 class TVPaintRpc(JsonRpc):
     def __init__(self, communication_obj, route_name="", **kwargs):
         super().__init__(**kwargs)
+        self.requests_ids = collections.defaultdict(lambda: 0)
+        self.waiting_requests = collections.defaultdict(list)
+        self.responses = collections.defaultdict(list)
+
         self.route_name = route_name
         self.communication_obj = communication_obj
         # Register methods
         self.add_methods(
             (route_name, self.workfiles_route)
         )
+
+    async def _handle_rpc_msg(self, http_request, raw_msg):
+        # This is duplicated code from super but there is no way how to do it
+        # to be able handle server->client requests
+        remote = http_request.remote
+        if remote in self.waiting_requests:
+            try:
+                msg = decode_msg(raw_msg.data)
+
+            except RpcError as error:
+                await self._ws_send_str(http_request, encode_error(error))
+                return
+
+            if (
+                msg.type == JsonRpcMsgTyp.RESULT
+                and msg.data["id"] in self.waiting_requests[remote]
+            ):
+                self.responses[remote].append(msg)
+                return
+
+        return await super()._handle_rpc_msg(http_request, raw_msg)
 
     def client_connected(self):
         # TODO This is poor check. Add check it is client from TVPaint
@@ -235,6 +264,39 @@ class TVPaintRpc(JsonRpc):
 
     def _execute_in_main_thread(self, item):
         return self.communication_obj.execute_in_main_thread(item)
+
+    def send_notification(self, client, method, params=[]):
+        client.ws.send_str(encode_request(method, params=params))
+
+    def send_request(self, client, method, params=[]):
+        client_remote = client.remote
+        request_id = self.requests_ids[client_remote]
+        self.requests_ids[client_remote] += 1
+        self.waiting_requests[client_remote].append(request_id)
+        self.loop.create_task(
+            client.ws.send_str(encode_request(method, request_id, params))
+        )
+
+        response = None
+        while True:
+            # TODO raise exception?
+            if client.ws.closed:
+                return None
+
+            for _response in self.responses[client_remote]:
+                _id = _response.data.get("id")
+                if _id == request_id:
+                    response = _response
+                    break
+
+        if response is None:
+            raise Exception("Connection closed")
+
+        error = response.data.get("error")
+        result = response.data.get("result")
+        if error:
+            raise Exception("Error happened: {}".format(error))
+        return result
 
 
 class MainThreadItem:
