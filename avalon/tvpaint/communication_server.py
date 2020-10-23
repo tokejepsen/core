@@ -105,14 +105,6 @@ class WebSocketServer:
             port = sock.getsockname()[1]
         return port
 
-    def call(self, func):
-        log.debug("websocket.call {}".format(func))
-        future = asyncio.run_coroutine_threadsafe(
-            func, self.loop
-        )
-        result = future.result()
-        return result
-
     def start(self):
         self.websocket_thread.start()
 
