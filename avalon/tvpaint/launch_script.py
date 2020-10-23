@@ -26,16 +26,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 class ProcessAliveChecker(QtCore.QThread):
-    def __init__(self, communicator, qt_app):
+    def __init__(self, communicator):
         super(ProcessAliveChecker, self).__init__()
-        self.process = communicator.process
-        self.websocket_server = communicator.websocket_server
-        self.qt_app = qt_app
+        self.communicator = communicator
 
     def run(self):
-        self.process.wait()
-        self.websocket_server.stop()
-        self.qt_app.quit()
+        self.communicator.process.wait()
+        self.communicator.stop()
 
 
 class MainThreadChecker(QtCore.QThread):
@@ -103,7 +100,7 @@ def main(app_executable, debug=False):
     main_thread_executor.start()
 
     if not DEBUG_MODE:
-        porcess_alive_checker = ProcessAliveChecker(communicator, qt_app)
+        porcess_alive_checker = ProcessAliveChecker(communicator)
         porcess_alive_checker.start()
 
     # Register terminal signal handler

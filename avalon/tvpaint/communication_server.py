@@ -285,3 +285,8 @@ class Communicator:
 
         log.info("Client has connected")
         api.emit("application.launched")
+
+    def stop(self):
+        log.info("Stopping communication")
+        self.websocket_server.stop()
+        self.qt_app.quit()
