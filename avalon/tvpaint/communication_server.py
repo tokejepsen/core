@@ -6,6 +6,7 @@ import subprocess
 import collections
 import asyncio
 import socket
+import platform
 import threading
 from queue import Queue
 from contextlib import closing
@@ -412,12 +413,14 @@ class Communicator:
 
         # Start TVPaint when server is running
         if not self.debug_mode:
-            self.process = subprocess.Popen(
-                host_executable,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env=os.environ
-            )
+            kwargs = {
+                "stdout": subprocess.PIPE,
+                "stderr": subprocess.PIPE,
+                "env": os.environ
+            }
+            if platform.system().lower() == "windows":
+                kwargs["creationflags"] = subprocess.DETACHED_PROCESS
+            self.process = subprocess.Popen(host_executable, **kwargs)
 
         log.info("Waiting for client connection")
         while True:
