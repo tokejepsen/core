@@ -73,13 +73,9 @@ class CommunicatorWrapper:
     @classmethod
     def execute_george(cls, george_script):
         # Result will have always 1024 chars (Current C++ implementation)
-        result = CommunicatorWrapper.send_request(
+        return CommunicatorWrapper.send_request(
             "execute_george", [george_script]
         )
-        if isinstance(result, str):
-            # Strip result as contain more.
-            result = result.strip()
-        return result
 
     @classmethod
     def send_notification(cls, method, params=[], client=None):
