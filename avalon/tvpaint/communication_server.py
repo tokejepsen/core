@@ -234,7 +234,7 @@ class TVPaintRpc(JsonRpc):
         self.communication_obj = communication_obj
         # Register methods
         self.add_methods(
-            (route_name, self.workfiles_route)
+            (route_name, self.workfiles_tool)
         )
 
     async def _handle_rpc_msg(self, http_request, raw_msg):
@@ -265,7 +265,7 @@ class TVPaintRpc(JsonRpc):
         return False
 
     # Panel routes for tools
-    async def workfiles_route(self):
+    async def workfiles_tool(self):
         log.info("Triggering Workfile tool")
         item = MainThreadItem(workfiles.show)
         result = self._execute_in_main_thread(item)
