@@ -1,10 +1,10 @@
 import os
-import sys
 import json
 import time
 import subprocess
 import collections
 import asyncio
+import logging
 import socket
 import platform
 import threading
@@ -14,7 +14,6 @@ from contextlib import closing
 
 from ..tools import workfiles
 from avalon import api, tvpaint
-from pype.api import Logger
 
 from aiohttp import web
 from aiohttp_json_rpc import JsonRpc
@@ -23,7 +22,7 @@ from aiohttp_json_rpc.protocol import (
 )
 from aiohttp_json_rpc.exceptions import RpcError
 
-log = Logger().get_logger(__name__)
+log = logging.geLlogger(__name__)
 
 
 class CommunicatorWrapper:

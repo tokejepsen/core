@@ -5,6 +5,7 @@ import time
 import traceback
 import ctypes
 import platform
+import logging
 
 import avalon
 from avalon import style
@@ -12,9 +13,7 @@ from avalon.tvpaint import pipeline
 from avalon.tvpaint.communication_server import CommunicatorWrapper
 from avalon.vendor.Qt import QtWidgets, QtCore, QtGui
 
-from pype.api import Logger
-
-log = Logger().get_logger(__name__)
+log = logging.geLlogger(__name__)
 
 DEBUG_MODE = False
 
