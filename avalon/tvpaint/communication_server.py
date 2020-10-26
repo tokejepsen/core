@@ -22,7 +22,7 @@ from aiohttp_json_rpc.protocol import (
 )
 from aiohttp_json_rpc.exceptions import RpcError
 
-log = logging.geLlogger(__name__)
+log = logging.getLogger(__name__)
 
 
 class CommunicatorWrapper:

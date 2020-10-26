@@ -13,7 +13,7 @@ from avalon.tvpaint import pipeline
 from avalon.tvpaint.communication_server import CommunicatorWrapper
 from avalon.vendor.Qt import QtWidgets, QtCore, QtGui
 
-log = logging.geLlogger(__name__)
+log = logging.getLogger(__name__)
 
 DEBUG_MODE = False
 
