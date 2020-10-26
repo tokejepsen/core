@@ -29,17 +29,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.app = app
 
 
-class ProcessAliveChecker(QtCore.QThread):
-    def __init__(self, communicator):
-        super(ProcessAliveChecker, self).__init__()
-        self.communicator = communicator
-
-    def run(self):
-        self.communicator.process.wait()
-        log.info("Host process ended.")
-        self.communicator.stop()
-
-
 class MainThreadChecker(QtCore.QThread):
     to_execute = QtCore.Signal(object)
 
@@ -121,9 +110,6 @@ def main(app_executable, debug=False):
     main_thread_executor.to_execute.connect(process_in_main_thread)
     main_thread_executor.start()
 
-    if not DEBUG_MODE:
-        porcess_alive_checker = ProcessAliveChecker(communicator)
-        porcess_alive_checker.start()
 
     # Register terminal signal handler
     def signal_handler(*args):
