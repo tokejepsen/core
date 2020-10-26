@@ -433,7 +433,7 @@ class Communicator:
             if self.websocket_rpc.client_connected():
                 log.info("Client has connected")
                 break
-            time.sleep(0.1)
+            time.sleep(0.5)
 
         api.emit("application.launched")
 
