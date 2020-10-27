@@ -11,8 +11,14 @@ import threading
 from queue import Queue
 from contextlib import closing
 
-
-from ..tools import workfiles
+from ..tools import (
+    workfiles,
+    creator,
+    loader,
+    publish,
+    sceneinventory,
+    libraryloader
+)
 from avalon import api, tvpaint
 
 from aiohttp import web
@@ -234,7 +240,12 @@ class TVPaintRpc(JsonRpc):
         self.communication_obj = communication_obj
         # Register methods
         self.add_methods(
-            (route_name, self.workfiles_tool)
+            (route_name, self.workfiles_tool),
+            (route_name, self.loader_tool),
+            (route_name, self.creator_tool),
+            (route_name, self.publish_tool),
+            (route_name, self.scene_inventory_tool),
+            (route_name, self.library_loader_tool)
         )
 
     async def _handle_rpc_msg(self, http_request, raw_msg):
@@ -268,6 +279,36 @@ class TVPaintRpc(JsonRpc):
     async def workfiles_tool(self):
         log.info("Triggering Workfile tool")
         item = MainThreadItem(workfiles.show)
+        result = self._execute_in_main_thread(item)
+        return result
+
+    async def loader_tool(self):
+        log.info("Triggering Loader tool")
+        item = MainThreadItem(loader.show)
+        result = self._execute_in_main_thread(item)
+        return result
+
+    async def creator_tool(self):
+        log.info("Triggering Creator tool")
+        item = MainThreadItem(creator.show)
+        result = self._execute_in_main_thread(item)
+        return result
+
+    async def publish_tool(self):
+        log.info("Triggering Publish tool")
+        item = MainThreadItem(publish.show)
+        result = self._execute_in_main_thread(item)
+        return result
+
+    async def scene_inventory_tool(self):
+        log.info("Triggering Scene inventory tool")
+        item = MainThreadItem(sceneinventory.show)
+        result = self._execute_in_main_thread(item)
+        return result
+
+    async def library_loader_tool(self):
+        log.info("Triggering Library loader tool")
+        item = MainThreadItem(libraryloader.show)
         result = self._execute_in_main_thread(item)
         return result
 
