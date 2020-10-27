@@ -15,8 +15,6 @@ from avalon.vendor.Qt import QtWidgets, QtCore, QtGui
 
 log = logging.getLogger(__name__)
 
-DEBUG_MODE = False
-
 
 def safe_excepthook(*args):
     traceback.print_exception(*args)
@@ -41,9 +39,9 @@ class MainThreadChecker(QtCore.QThread):
 
 
 def process_in_main_thread(main_thread_item):
-    log.info("Process in main thread")
+    log.debug("Executing process in main thread")
     if main_thread_item.done:
-        log.info("Item is done")
+        log.warning("- item is processed")
         return
 
     callback = main_thread_item.callback
@@ -74,9 +72,6 @@ def avalon_icon_path():
 
 
 def main(app_executable, debug=False):
-    global DEBUG_MODE
-    DEBUG_MODE = debug
-
     sys.excepthook = safe_excepthook
 
     # Create QtApplication for tools
@@ -96,19 +91,17 @@ def main(app_executable, debug=False):
     # Execute pipeline installation
     pipeline.install()
 
-    communicator = CommunicatorWrapper.create_communicator(qt_app, DEBUG_MODE)
+    communicator = CommunicatorWrapper.create_communicator(qt_app)
     communicator.launch(app_executable)
 
     main_thread_executor = MainThreadChecker(communicator)
     main_thread_executor.to_execute.connect(process_in_main_thread)
     main_thread_executor.start()
 
-
     # Register terminal signal handler
-    def signal_handler(*args):
+    def signal_handler(*_args):
         print("You pressed Ctrl+C. Process ended.")
         communicator.stop()
-        qt_app.quit()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -118,9 +111,5 @@ def main(app_executable, debug=False):
 
 
 if __name__ == "__main__":
-    debug_mode = "debug" in sys.argv
-    executable_path = None
-    if not debug_mode:
-        executable_path = sys.argv[0]
-
-    main(executable_path, debug_mode)
+    executable_path = sys.argv[0]
+    main(executable_path)

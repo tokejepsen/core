@@ -400,9 +400,7 @@ class MainThreadItem:
 
 
 class Communicator:
-    def __init__(self, qt_app, debug_mode=False):
-        self.debug_mode = debug_mode
-
+    def __init__(self, qt_app):
         self.callback_queue = Queue()
         self.qt_app = qt_app
 
@@ -417,7 +415,7 @@ class Communicator:
 
     def main_thread_listen(self):
         # check if host still running
-        if not self.debug_mode and self.process.poll() is not None:
+        if self.process.poll() is not None:
             self.websocket_server.stop()
             return self.qt_app.quit()
 
@@ -450,17 +448,16 @@ class Communicator:
             time.sleep(0.1)
 
         # Start TVPaint when server is running
-        if not self.debug_mode:
-            kwargs = {
-                "stdout": subprocess.PIPE,
-                "stderr": subprocess.PIPE,
-                "env": os.environ
-            }
-            self.process = subprocess.Popen(host_executable, **kwargs)
+        kwargs = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "env": os.environ
+        }
+        self.process = subprocess.Popen(host_executable, **kwargs)
 
         log.info("Waiting for client connection")
         while True:
-            if not self.debug_mode and self.process.poll() is not None:
+            if self.process.poll() is not None:
                 log.debug("Host process is not alive. Exiting")
                 self.websocket_server.stop()
                 self.qt_app.quit()
