@@ -22,13 +22,6 @@ def safe_excepthook(*args):
     traceback.print_exception(*args)
 
 
-class MainWindow(QtWidgets.QMainWindow):
-    """Window to keep QtApplication run."""
-    def __init__(self, app):
-        super(MainWindow, self).__init__()
-        self.app = app
-
-
 class MainThreadChecker(QtCore.QThread):
     to_execute = QtCore.Signal(object)
 
