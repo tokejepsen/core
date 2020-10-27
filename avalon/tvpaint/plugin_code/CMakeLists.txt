@@ -23,21 +23,23 @@ option(WEBSOCKETPP_LIB_DIR "Websocketpp lib path" "")
 
 option(JSONRPCPP_INCLUDE "Jsonrpcpp include path" "")
 
+find_package(Boost 1.72.0 COMPONENTS random)
+
 include_directories(
         "${TVPAINT_SDK_INCLUDE}"
         "${OPENSSL_INCLUDE}"
         "${WEBSOCKETPP_INCLUDE}"
         "${JSONRPCPP_INCLUDE}"
+        "${Boost_INCLUDE_DIR}"
 )
 link_directories(
         "${OPENSSL_LIB_DIR}"
         "${WEBSOCKETPP_LIB_DIR}"
 )
+
 add_library(jsonrpcpp INTERFACE)
-find_package(Boost 1.72.0 COMPONENTS random)
 
 add_library(${PROJECT_NAME} SHARED library.cpp library.def "${TVPAINT_SDK_LIB}/dllx.c")
 
-include_directories(${Boost_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES})
 target_link_libraries(${PROJECT_NAME} jsonrpcpp)
