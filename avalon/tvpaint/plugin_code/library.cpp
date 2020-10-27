@@ -594,8 +594,10 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
                 TVWarning( iFilter, TXT_REQUESTER_ERROR );
                 return  0;
             }
-            Data.mReq = req;
+            // Catch ticks
+            TVGrabTicks(iFilter, req, PITICKS_FLAG_ON);
 
+            Data.mReq = req;
             // This is a very simple requester, so we create it's content right here instead
             // of waiting for the PICBREQ_OPEN message...
             // Not recommended for more complex requesters. (see the other examples)
