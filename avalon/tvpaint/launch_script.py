@@ -44,6 +44,11 @@ def process_in_main_thread(main_thread_item):
 
 
 def avalon_icon_path():
+    """Path to avalon icon image.
+
+    Returns:
+        str: Path to avalon icon file. Returns None if file was not found.
+    """
     avalon_repo = os.path.dirname(
         os.path.dirname(os.path.abspath(avalon.__file__))
     )

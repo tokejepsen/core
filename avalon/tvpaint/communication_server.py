@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import time
 import subprocess
@@ -373,6 +374,14 @@ class TVPaintRpc(JsonRpc):
 
 
 class MainThreadItem:
+    """Structure to store information about callback in main thread.
+
+    Item should be used to execute callback in main thread which may be needed
+    for execution of Qt objects.
+
+    Item store callback (callable variable), arguments and keyword arguments
+    for the callback. Item hold information about it's process.
+    """
     not_set = object()
     sleep_time = 0.1
 
@@ -441,10 +450,18 @@ class Communicator:
         self.websocket_rpc = None
 
     def execute_in_main_thread(self, main_thread_item):
+        """Add `MainThreadItem` to callback queue and wait for result."""
         self.callback_queue.put(main_thread_item)
         return main_thread_item.wait()
 
     def main_thread_listen(self):
+        """Get last `MainThreadItem` from queue.
+
+        Must be called from main thread.
+
+        Method checks if host process is still running as it may cause
+        issues if not.
+        """
         # check if host still running
         if self.process.poll() is not None:
             self.websocket_server.stop()
@@ -455,6 +472,19 @@ class Communicator:
         return self.callback_queue.get()
 
     def _windows_copy(self, src_dst_mapping):
+        """Windows specific copy process asking for admin permissions.
+
+        It is required to have administration permissions to copy plugin to
+        TVPaint installation folder.
+
+        Method requires `pywin32` python module.
+
+        Args:
+            src_dst_mapping (list, tuple, set): Mapping of source file to
+                destination. Both must be full path. Each item must be iterable
+                of size 2 `(C:/src/file.dll, C:/dst/file.dll)`.
+        """
+
         from win32com.shell import shell
         import pythoncom
 
@@ -492,6 +522,14 @@ class Communicator:
         fo.PerformOperations()
 
     def _prepare_windows(self, host_executable):
+        """Copy plugin to TVPaint plugins and set PATH to dependencies.
+
+        Check if plugin in TVPaint's plugins exist and match to plugin
+        version to current implementation version. Based on 64-bit or 32-bit
+        version of the plugin. Path to libraries required for plugin is added
+        to PATH variable.
+        """
+
         executable_file = os.path.basename(host_executable)
         if "64bit" in executable_file:
             subfolder = "windows_x64"
@@ -569,6 +607,11 @@ class Communicator:
         self.process = subprocess.Popen(host_executable, **kwargs)
 
     def launch(self, host_executable):
+        """Prepare all required data and launch host.
+
+        First is prepared websocket server as communication point for host,
+        when server is ready to use host is launched as subprocess.
+        """
         log.info("Installing TVPaint implementation")
         api.install(tvpaint)
 
@@ -611,6 +654,7 @@ class Communicator:
         api.emit("application.launched")
 
     def stop(self):
+        """Stop communication and currently running python process."""
         log.info("Stopping communication")
         self.websocket_server.stop()
         self.qt_app.quit()
