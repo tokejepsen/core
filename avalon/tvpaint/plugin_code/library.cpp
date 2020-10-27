@@ -188,10 +188,10 @@ public:
         m_thread->join();
     }
 
-    connection_metadata::ptr get_client_metadata() {
-        return client_metadata;
+    bool connected()
+    {
+        return (client_metadata && client_metadata->get_status() == "Open");
     }
-
     int connect(std::string const &uri) {
         if (client_metadata && client_metadata->get_status() == "Open") {
             std::cout << "> Already connected" << std::endl;
@@ -282,19 +282,12 @@ public:
     void send_request(jsonrpcpp::Request *request) {
         client_metadata->send_request(request);
     }
-
-    connection_metadata::ptr get_metadata() const {
-        return client_metadata;
-    }
 };
 
 class Communicator {
 private:
     // URL to websocket server
     std::string websocket_url;
-    // Is communicator connected to server
-    // - may be used to reconnect if needed (not implemented)
-    bool connected;
     // Should be avalon plugin available?
     // - this may change during processing if websocketet url is not set or server is down
     bool use_avalon;
@@ -312,9 +305,6 @@ public:
 Communicator::Communicator() {
     // URL to websocket server
     websocket_url = std::getenv("WEBSOCKET_URL");
-    // Is communicator connected to server
-    // - may be used to reconnect if needed (not implemented)
-    connected = false;
     // Should be avalon plugin available?
     // - this may change during processing if websocketet url is not set or server is down
     if (websocket_url == "") {
@@ -325,7 +315,7 @@ Communicator::Communicator() {
 }
 
 bool Communicator::is_connected(){
-    return connected;
+    return endpoint.connected();
 }
 
 bool Communicator::is_usable(){
@@ -341,16 +331,14 @@ void Communicator::connect()
     con_result = endpoint.connect(websocket_url);
     if (con_result == -1)
     {
-        connected = false;
         use_avalon = false;
     } else {
-        connected = true;
         use_avalon = true;
     }
 }
 
 void Communicator::call_notification(std::string method_name, nlohmann::json params) {
-    if (!use_avalon || !connected) {return;}
+    if (!use_avalon || !is_connected()) {return;}
 
     jsonrpcpp::Notification notification = {method_name, params};
     endpoint.send_notification(&notification);
@@ -358,7 +346,7 @@ void Communicator::call_notification(std::string method_name, nlohmann::json par
 
 jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann::json params) {
     jsonrpcpp::Response response;
-    if (!use_avalon || !connected)
+    if (!use_avalon || !is_connected())
     {
         return response;
     }
@@ -381,7 +369,7 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
 }
 
 void Communicator::process_requests() {
-    if (!use_avalon || !connected || messages.empty()) {return;}
+    if (!use_avalon || !is_connected() || messages.empty()) {return;}
 
     while (!messages.empty()) {
         std::string msg = messages.front();
