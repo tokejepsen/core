@@ -92,20 +92,6 @@ public:
         process_message(json_str);
     }
 
-    void ping(nlohmann::json entity) {
-        // add seqeunce to result
-        entity["result"]["seq"] = entity["params"]["seq"];
-
-        // remove params and method keys
-        nlohmann::json::iterator params_it = entity.find("params");
-        nlohmann::json::iterator method_it = entity.find("method");
-        entity.erase(method_it);
-        entity.erase(params_it);
-
-        // send response
-        send(entity.dump());
-    }
-
     void process_message(std::string msg) {
         std::cout << "--> " << msg << "\n";
         try {
