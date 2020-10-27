@@ -468,11 +468,29 @@ Communicator communication;
 // you should try to respect it, as this makes life easier for the end user
 // (for stacking several requesters, and so on...).
 #define REQUESTER_W  185
-#define REQUESTER_H  30
+#define REQUESTER_H  130
 
 
 // ID's of GUI components
-#define ID_WORKFILES     10
+#define ID_WORKFILES                10
+#define ID_LOADER                   11
+#define ID_CREATOR                  12
+#define ID_SCENE_INVENTORY          13
+#define ID_PUBLISH                  14
+#define ID_LIBRARY_LOADER           15
+
+#define TXT_WORKFILES               "Workfiles"
+#define TXT_WORKFILES_HELP          "Open workfiles tool"
+#define TXT_LOADER                  "Load"
+#define TXT_LOADER_HELP             "Open loader tool"
+#define TXT_CREATOR                 "Create"
+#define TXT_CREATOR_HELP            "Open creator tool"
+#define TXT_SCENE_INVENTORY         "Scene inventory"
+#define TXT_SCENE_INVENTORY_HELP    "Open scene inventory tool"
+#define TXT_PUBLISH                 "Publish"
+#define TXT_PUBLISH_HELP            "Open publisher"
+#define TXT_LIBRARY_LOADER          "Library"
+#define TXT_LIBRARY_LOADER_HELP     "Open library loader tool"
 
 
 /**************************************************************************************/
@@ -484,9 +502,6 @@ Communicator communication;
 #define TXT_NAME        "Avalon"
 
 #define TXT_REQUESTER   "Avalon tools"
-
-#define TXT_WORKFILES       "Workfiles"
-#define TXT_HELP_WORKFILES  "Open workfiles tool"
 
 
 #define TXT_ERROR01     "Can't Open Requester !"
@@ -566,7 +581,8 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
             // We use a variable to contains the vertical position of the buttons.
             // Each time we create a button, we add its size to this variable.
             // This makes it very easy to add/remove/displace buttons in a requester.
-            int  y = 5;
+            int y_pos = 5;
+            int y_offset = 20;
 
             // Create the requester, without a "menu bar" 'coz we don't need it
             // in this simple example.
@@ -592,17 +608,26 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
             // The ID of the button is ID_FLIPX.
             // The type of the button is PIRBF_BUTTON_NORMAL.
             // The string "Flip X" is written in the middle of the button.
-            TVAddButtonReq( iFilter, Data.mReq, 9, y, REQUESTER_W-19, 0, ID_WORKFILES, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_WORKFILES );
+            TVAddButtonReq( iFilter, Data.mReq, 9, y_pos, REQUESTER_W-19, 0, ID_WORKFILES, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_WORKFILES );
+            y_pos += y_offset;
+            TVAddButtonReq( iFilter, Data.mReq, 9, y_pos, REQUESTER_W-19, 0, ID_LOADER, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_LOADER );
+            y_pos += y_offset;
+            TVAddButtonReq( iFilter, Data.mReq, 9, y_pos, REQUESTER_W-19, 0, ID_CREATOR, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_CREATOR );
+            y_pos += y_offset;
+            TVAddButtonReq( iFilter, Data.mReq, 9, y_pos, REQUESTER_W-19, 0, ID_SCENE_INVENTORY, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_SCENE_INVENTORY );
+            y_pos += y_offset;
+            TVAddButtonReq( iFilter, Data.mReq, 9, y_pos, REQUESTER_W-19, 0, ID_PUBLISH, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_PUBLISH );
+            y_pos += y_offset;
+            TVAddButtonReq( iFilter, Data.mReq, 9, y_pos, REQUESTER_W-19, 0, ID_LIBRARY_LOADER, PIRBF_BUTTON_NORMAL|PIRBF_BUTTON_ACTION, TXT_LIBRARY_LOADER );
 
             // Put a help messages on it.
             // Help Popup
-            TVSetButtonInfoText( iFilter, Data.mReq, ID_WORKFILES, TXT_HELP_WORKFILES );
-
-            // On to the next button !
-            y += 20;
-
-            // And another button.
-            y += 20;
+            TVSetButtonInfoText( iFilter, Data.mReq, ID_WORKFILES, TXT_WORKFILES_HELP );
+            TVSetButtonInfoText( iFilter, Data.mReq, ID_LOADER, TXT_LOADER_HELP );
+            TVSetButtonInfoText( iFilter, Data.mReq, ID_PUBLISH, TXT_PUBLISH_HELP );
+            TVSetButtonInfoText( iFilter, Data.mReq, ID_CREATOR, TXT_CREATOR_HELP );
+            TVSetButtonInfoText( iFilter, Data.mReq, ID_SCENE_INVENTORY, TXT_SCENE_INVENTORY_HELP );
+            TVSetButtonInfoText( iFilter, Data.mReq, ID_LIBRARY_LOADER, TXT_LIBRARY_LOADER_HELP );
         }
         else
         {
