@@ -456,8 +456,6 @@ class Communicator:
                 "stderr": subprocess.PIPE,
                 "env": os.environ
             }
-            if platform.system().lower() == "windows":
-                kwargs["creationflags"] = subprocess.DETACHED_PROCESS
             self.process = subprocess.Popen(host_executable, **kwargs)
 
         log.info("Waiting for client connection")
