@@ -179,16 +179,8 @@ public:
     void close_connection() {
         m_endpoint.stop_perpetual();
 
-        // Only client connection
-        if (client_metadata->get_status() == "Open") {
-            std::cout << "> Closing connection" << std::endl;
+        close(websocketpp::close::status::going_away, "");
 
-            websocketpp::lib::error_code ec;
-            m_endpoint.close(client_metadata->get_hdl(), websocketpp::close::status::going_away, "", ec);
-            if (ec) {
-                std::cout << "> Error closing connection: " << ec.message() << std::endl;
-            }
-        }
         m_thread->join();
     }
 
@@ -197,17 +189,17 @@ public:
     }
 
     int connect(std::string const &uri) {
+        if (client_metadata && client_metadata->get_status() == "Open") {
+            std::cout << "> Already connected" << std::endl;
+            return 0;
+        }
+
         m_endpoint.init_asio();
         m_endpoint.start_perpetual();
 
         m_thread.reset(new websocketpp::lib::thread(&client::run, &m_endpoint));
 
         websocketpp::lib::error_code ec;
-
-        if (client_metadata && client_metadata->get_status() == "Open") {
-            std::cout << "> Already connected" << std::endl;
-            return 0;
-        }
 
         client::connection_ptr con = m_endpoint.get_connection(uri, ec);
 
