@@ -16,19 +16,15 @@
 #include <string>
 #include <queue>
 
-#include <pthread.h>
-
 #include "json.hpp"
 #include "jsonrpcpp.hpp"
 
 // All functions not exported should be static.
 // All global variables should be static.
 
-#define DEBUG_MSG(str) do { std::cout << str << std::endl; } while( false )
-
-static struct
 // mReq Identification of the requester.  (=0 closed, !=0 requester ID)
-{DWORD mReq;} Data = {0};
+static struct {DWORD mReq;} Data = {0};
+
 PIFilter *current_filter;
 
 // Json rpc 2.0 parser - for handling messages and callbacks
@@ -184,9 +180,10 @@ public:
 
         client::connection_ptr con = m_endpoint.get_con_from_hdl(client_metadata->get_hdl());
         // Close client
-        close(websocketpp::close::status::going_away, "");
+        close(websocketpp::close::status::normal, "");
         // Close Connection
-        con->close(websocketpp::close::status::going_away, "");
+        // TODO try to find more specific way this is so slow
+        con->close(websocketpp::close::status::normal, "");
         // Join thread
         m_thread->join();
     }
@@ -490,7 +487,6 @@ std::string label_from_evn()
 std::string plugin_label = label_from_evn();
 
 #define TXT_REQUESTER   "Tools"
-
 
 #define TXT_ERROR01     "Can't Open Requester !"
 
