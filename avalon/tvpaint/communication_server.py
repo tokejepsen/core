@@ -130,9 +130,10 @@ class WebSocketServer:
 
     def stop(self):
         try:
-            log.debug("Stopping websocket server")
-            self.websocket_thread.is_running = False
-            self.websocket_thread.stop()
+            if self.websocket_thread.is_running:
+                log.debug("Stopping websocket server")
+                self.websocket_thread.is_running = False
+                self.websocket_thread.stop()
         except Exception:
             log.warning(
                 "Error has happened during Killing websocket server",
