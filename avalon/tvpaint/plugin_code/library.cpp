@@ -3,11 +3,11 @@
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
+#include <fstream>
 #include "plugdllx.h"
 #include "plugx.h"
 
 #include <boost/chrono.hpp>
-#include <boost/thread/thread.hpp>
 
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
@@ -24,8 +24,15 @@
 // All functions not exported should be static.
 // All global variables should be static.
 
-jsonrpcpp::Parser parser;
+#define DEBUG_MSG(str) do { std::cout << str << std::endl; } while( false )
+
+static struct
+// mReq Identification of the requester.  (=0 closed, !=0 requester ID)
+{DWORD mReq;} Data = {0};
 PIFilter *current_filter;
+
+jsonrpcpp::Parser parser;
+static pthread_t ws_thread;
 
 typedef websocketpp::client<websocketpp::config::asio_client> client;
 
@@ -169,8 +176,6 @@ public:
 };
 
 
-static pthread_t ws_thread;
-
 void* websocket_thread(void *x_void_ptr) {
     client *m_endpoint = (client *)x_void_ptr;
     m_endpoint->init_asio();
@@ -185,15 +190,10 @@ private:
     client m_endpoint;
     connection_metadata::ptr client_metadata;
 
-    //websocketpp::lib::shared_ptr<websocketpp::lib::thread> m_thread;
-
 public:
     websocket_endpoint() {
         m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
         m_endpoint.clear_error_channels(websocketpp::log::elevel::all);
-
-
-        //m_thread = websocketpp::lib::make_shared<websocketpp::lib::thread>(&client::run, &m_endpoint);
     }
 
     ~websocket_endpoint() {
@@ -209,7 +209,6 @@ public:
                 std::cout << "> Error closing connection: " << ec.message() << std::endl;
             }
         }
-        //m_thread->join();
         pthread_join(ws_thread, NULL);
     }
 
@@ -475,10 +474,6 @@ Communicator communication;
 // ID's of GUI components
 #define ID_WORKFILES     10
 
-
-static struct
-// mReq Identification of the requester.  (=0 closed, !=0 requester ID)
-{DWORD mReq;} Data = {0};
 
 /**************************************************************************************/
 //  Localisation
