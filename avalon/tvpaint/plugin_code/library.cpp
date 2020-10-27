@@ -197,6 +197,10 @@ public:
     }
 
     ~websocket_endpoint() {
+        close_connection();
+    }
+
+    void close_connection() {
         m_endpoint.stop_perpetual();
 
         // Only client connection
@@ -564,6 +568,7 @@ int FAR PASCAL PI_Open( PIFilter* iFilter )
 
 void FAR PASCAL PI_Close( PIFilter* iFilter )
 {
+    communication.endpoint.close_connection();
 }
 
 
