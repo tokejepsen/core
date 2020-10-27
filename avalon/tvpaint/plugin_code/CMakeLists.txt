@@ -12,18 +12,16 @@ if(MSVC)
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
 
-# get from environemnts
-set(BOOST_ROOT "C:/libs/boost/x86")
+# TODO better options
+option(BOOST_ROOT "Path to root of Boost" "")
 
-set(OPENSSL_INCLUDE "C:/libs/openssl/build/x86/Debug/static/include")
-set(OPENSSL_LIB_DIR "C:/libs/openssl/build/x86/Debug/static/lib")
+option(OPENSSL_INCLUDE "OpenSSL  include path" "")
+option(OPENSSL_LIB_DIR "OpenSSL lib path" "")
 
-set(WEBSOCKETPP_INCLUDE "C:/libs/websocketpp/include")
-set(WEBSOCKETPP_LIB_DIR "C:/libs/websocketpp/Debug/x86")
+option(WEBSOCKETPP_INCLUDE "Websocketpp include path" "")
+option(WEBSOCKETPP_LIB_DIR "Websocketpp lib path" "")
 
-set(JSONRPCPP_SOURCE_DIR "C:/libs/jsonrpcpp/source")
-set(JSONRPCPP_INCLUDE "${JSONRPCPP_SOURCE_DIR}/include")
-
+option(JSONRPCPP_INCLUDE "Jsonrpcpp include path" "")
 
 include_directories(
         "${TVPAINT_SDK_INCLUDE}"
