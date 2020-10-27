@@ -16,7 +16,7 @@ from .workio import (
 
 __all__ = (
     "launch_script",
-    
+
     "install",
     "uninstall",
     "ls",
