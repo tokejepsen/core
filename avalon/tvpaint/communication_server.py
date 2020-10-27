@@ -43,6 +43,10 @@ class CommunicatorWrapper:
     communicator = None
     _connected_client = None
 
+    # Variable which can be modified to register localization file from
+    # config
+    localization_file = None
+
     @classmethod
     def create_communicator(cls, *args, **kwargs):
         if not cls.communicator:
@@ -85,7 +89,7 @@ class CommunicatorWrapper:
 
     @classmethod
     def execute_george(cls, george_script):
-        # Result will have always 1024 chars (Current C++ implementation)
+        """Execute passed goerge script in TVPaint."""
         return CommunicatorWrapper.send_request(
             "execute_george", [george_script]
         )
@@ -101,6 +105,17 @@ class CommunicatorWrapper:
         cls.communicator.websocket_rpc.send_notification(
             client, method, params
         )
+
+
+def register_localization_file(filepath):
+    """Register localization file to be copied with TVPaint plugins.
+
+    This is meant to be called and set from config.
+
+    Args:
+        filepath (str): Full path to `.loc` file.
+    """
+    CommunicatorWrapper.localization_file = filepath
 
 
 class WebSocketServer:
@@ -529,7 +544,7 @@ class Communicator:
         # commit
         fo.PerformOperations()
 
-    def _prepare_windows_plugin(self, launch_args, localization_file):
+    def _prepare_windows_plugin(self, launch_args):
         """Copy plugin to TVPaint plugins and set PATH to dependencies.
 
         Check if plugin in TVPaint's plugins exist and match to plugin
@@ -588,15 +603,18 @@ class Communicator:
                 to_copy.append((src_full_path, dst_full_path))
 
         # Add localization file is there is any
-        if localization_file and os.path.exists(localization_file):
+        localization_file_src = CommunicatorWrapper.localization_file
+        if localization_file_src and os.path.exists(localization_file_src):
             localization_file_dst = os.path.join(
                 host_plugins_path, LOCALIZATION_FILENAME
             )
             if (
                 not os.path.exists(localization_file_dst)
-                or not filecmp.cmp(localization_file, localization_file_dst)
+                or not filecmp.cmp(
+                    localization_file_src, localization_file_dst
+                )
             ):
-                to_copy.append((localization_file, localization_file_dst))
+                to_copy.append((localization_file_src, localization_file_dst))
 
         # Skip copy if everything is done
         if not to_copy:
@@ -618,9 +636,8 @@ class Communicator:
             raise RuntimeError("Copying of plugin was not successfull")
 
     def _launch_tv_paint(self, launch_args):
-        localization_file = self.localization_file()
         if platform.system().lower() == "windows":
-            self._prepare_windows_plugin(launch_args, localization_file)
+            self._prepare_windows_plugin(launch_args)
 
         kwargs = {
             "stdout": subprocess.PIPE,
