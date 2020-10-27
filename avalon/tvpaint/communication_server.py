@@ -29,6 +29,7 @@ from aiohttp_json_rpc.protocol import (
 from aiohttp_json_rpc.exceptions import RpcError
 
 log = logging.getLogger(__name__)
+log.setLevel(logging.DEBUG)
 
 
 class CommunicatorWrapper:
@@ -161,11 +162,11 @@ class WebsocketServerThread(threading.Thread):
         self.is_running = True
 
         try:
-            log.info("Starting websocket server")
+            log.debug("Starting websocket server")
 
             self.loop.run_until_complete(self.start_server())
 
-            log.debug(
+            log.info(
                 "Running Websocket server on URL:"
                 " \"ws://localhost:{}\"".format(self.port)
             )
@@ -211,11 +212,11 @@ class WebsocketServerThread(threading.Thread):
 
             await asyncio.sleep(0.5)
 
-        log.debug("Starting shutdown")
+        log.debug("## Server shutdown started")
         await self.site.stop()
-        log.debug("Site stopped")
+        log.debug("# Site stopped")
         await self.runner.cleanup()
-        log.debug("Runner stopped")
+        log.debug("# Server runner stopped")
         tasks = [
             task for task in asyncio.all_tasks()
             if task is not asyncio.current_task()
