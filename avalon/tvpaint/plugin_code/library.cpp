@@ -4,6 +4,10 @@
 #include <iostream>
 #include <cstring>
 #include <fstream>
+#include <map>
+#include <string>
+#include <queue>
+
 #include "plugdllx.h"
 #include "plugx.h"
 
@@ -11,10 +15,6 @@
 
 #include <websocketpp/config/asio_no_tls_client.hpp>
 #include <websocketpp/client.hpp>
-
-#include <map>
-#include <string>
-#include <queue>
 
 #include "json.hpp"
 #include "jsonrpcpp.hpp"
