@@ -384,20 +384,14 @@ class MainThreadItem:
         self.args = args
         self.kwargs = kwargs
 
-    def handle_result(self):
-        if self.exc_info is self.not_set:
-            return self.result
-        raise self.exc_info
 
     def wait(self):
         while not self.done:
             time.sleep(self.sleep_time)
-        return self.handle_result()
 
-    async def asyncio_wait(self):
-        while not self.done:
-            await asyncio.sleep(self.sleep_time)
-        return self.handle_result()
+        if self.exc_info is self.not_set:
+            return self.result
+        raise self.exc_info
 
 
 class Communicator:
