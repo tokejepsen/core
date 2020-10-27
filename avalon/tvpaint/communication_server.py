@@ -521,7 +521,7 @@ class Communicator:
         # commit
         fo.PerformOperations()
 
-    def _prepare_windows(self, host_executable):
+    def _prepare_windows_plugin(self, launch_args):
         """Copy plugin to TVPaint plugins and set PATH to dependencies.
 
         Check if plugin in TVPaint's plugins exist and match to plugin
@@ -530,6 +530,7 @@ class Communicator:
         to PATH variable.
         """
 
+        host_executable = launch_args[0]
         executable_file = os.path.basename(host_executable)
         if "64bit" in executable_file:
             subfolder = "windows_x64"
@@ -595,18 +596,18 @@ class Communicator:
         if invalid:
             raise RuntimeError("Copying of plugin was not successfull")
 
-    def _launch_tv_paint(self, host_executable):
+    def _launch_tv_paint(self, launch_args):
         if platform.system().lower() == "windows":
-            self._prepare_windows(host_executable)
+            self._prepare_windows_plugin(launch_args)
 
         kwargs = {
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
             "env": os.environ
         }
-        self.process = subprocess.Popen(host_executable, **kwargs)
+        self.process = subprocess.Popen(launch_args, **kwargs)
 
-    def launch(self, host_executable):
+    def launch(self, launch_args):
         """Prepare all required data and launch host.
 
         First is prepared websocket server as communication point for host,
@@ -636,7 +637,7 @@ class Communicator:
             time.sleep(0.1)
 
         # Start TVPaint when server is running
-        self._launch_tv_paint(host_executable)
+        self._launch_tv_paint(launch_args)
 
         log.info("Waiting for client connection")
         while True:

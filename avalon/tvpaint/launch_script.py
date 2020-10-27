@@ -60,18 +60,22 @@ def avalon_icon_path():
     return None
 
 
-def main(app_executable, debug=False):
+def main(launch_args):
+    # Be sure server won't crash at any moment but just print traceback
     sys.excepthook = safe_excepthook
 
     # Create QtApplication for tools
+    # - QApplicaiton is also main thread/event loop of the server
     qt_app = QtWidgets.QApplication([])
     qt_app.setQuitOnLastWindowClosed(False)
     qt_app.setStyleSheet(style.load_stylesheet())
 
+    # Set application name to be able show application icon in task bar
     if platform.system().lower() == "windows":
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
             u"WebsocketServer"
         )
+    # Load avalon icon
     icon_path = avalon_icon_path()
     if icon_path:
         icon = QtGui.QIcon(icon_path)
@@ -80,9 +84,12 @@ def main(app_executable, debug=False):
     # Execute pipeline installation
     pipeline.install()
 
+    # Create Communicator object and trigger launch
+    # - this must be done before anything is processed
     communicator = CommunicatorWrapper.create_communicator(qt_app)
-    communicator.launch(app_executable)
+    communicator.launch(launch_args)
 
+    # Start thread to check callbacks from websocket server to be done
     main_thread_executor = MainThreadChecker(communicator)
     main_thread_executor.to_execute.connect(process_in_main_thread)
     main_thread_executor.start()
@@ -100,5 +107,8 @@ def main(app_executable, debug=False):
 
 
 if __name__ == "__main__":
-    executable_path = sys.argv[0]
-    main(executable_path)
+    launch_args = list(sys.argv)
+    if os.path.abspath(__file__) == os.path.normpath(launch_args[0]):
+        # Pop path to script
+        launch_args.pop(0)
+    main(launch_args)
