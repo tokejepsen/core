@@ -23,7 +23,13 @@
 // All global variables should be static.
 
 // mReq Identification of the requester.  (=0 closed, !=0 requester ID)
-static struct {DWORD mReq;} Data = {0};
+static struct {
+    DWORD mReq;
+    void* mLocalFile;
+} Data = {
+    0,
+    NULL
+};
 
 PIFilter *current_filter;
 
@@ -426,36 +432,36 @@ Communicator communication;
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+static char* GetLocalString( PIFilter* iFilter, int iNum, char* iDefault )
+{
+char*  str;
+
+if( Data.mLocalFile == NULL )
+return  iDefault;
+
+str = TVGetLocalString( iFilter, Data.mLocalFile, iNum );
+if( str == NULL  ||  strlen( str ) == 0 )
+return  iDefault;
+
+return  str;
+}
+
 // sizes of some GUI components
 
 // 185 is the standard width of most requesters in Aura.
 // you should try to respect it, as this makes life easier for the end user
 // (for stacking several requesters, and so on...).
 #define REQUESTER_W  185
-#define REQUESTER_H  130
+#define REQUESTER_H  110
 
 
 // ID's of GUI components
 #define ID_WORKFILES                10
-#define ID_LOADER                   11
-#define ID_CREATOR                  12
-#define ID_SCENE_INVENTORY          13
-#define ID_PUBLISH                  14
-#define ID_LIBRARY_LOADER           15
-
-#define TXT_WORKFILES               "Workfiles"
-#define TXT_WORKFILES_HELP          "Open workfiles tool"
-#define TXT_LOADER                  "Load"
-#define TXT_LOADER_HELP             "Open loader tool"
-#define TXT_CREATOR                 "Create"
-#define TXT_CREATOR_HELP            "Open creator tool"
-#define TXT_SCENE_INVENTORY         "Scene inventory"
-#define TXT_SCENE_INVENTORY_HELP    "Open scene inventory tool"
-#define TXT_PUBLISH                 "Publish"
-#define TXT_PUBLISH_HELP            "Open publisher"
-#define TXT_LIBRARY_LOADER          "Library"
-#define TXT_LIBRARY_LOADER_HELP     "Open library loader tool"
-
+#define ID_LOADER                   20
+#define ID_CREATOR                  30
+#define ID_SCENE_INVENTORY          40
+#define ID_PUBLISH                  50
+#define ID_LIBRARY_LOADER           60
 
 /**************************************************************************************/
 //  Localisation
@@ -474,11 +480,23 @@ std::string label_from_evn()
 }
 std::string plugin_label = label_from_evn();
 
-#define TXT_REQUESTER   "Tools"
+#define TXT_REQUESTER               GetLocalString( iFilter, 100, "Avalon Tools" )
 
-#define TXT_ERROR01     "Can't Open Requester !"
+#define TXT_WORKFILES               GetLocalString( iFilter, 10010, "Workfiles" )
+#define TXT_LOADER                  GetLocalString( iFilter, 10020, "Load")
+#define TXT_CREATOR                 GetLocalString( iFilter, 10030, "Create")
+#define TXT_SCENE_INVENTORY         GetLocalString( iFilter, 10040, "Scene inventory")
+#define TXT_PUBLISH                 GetLocalString( iFilter, 10050, "Publish")
+#define TXT_LIBRARY_LOADER          GetLocalString( iFilter, 10060, "Library")
 
+#define TXT_WORKFILES_HELP          GetLocalString( iFilter, 20010, "Open workfiles tool")
+#define TXT_LOADER_HELP             GetLocalString( iFilter, 20020, "Open loader tool")
+#define TXT_CREATOR_HELP            GetLocalString( iFilter, 20030, "Open creator tool")
+#define TXT_SCENE_INVENTORY_HELP    GetLocalString( iFilter, 20040, "Open scene inventory tool")
+#define TXT_PUBLISH_HELP            GetLocalString( iFilter, 20050, "Open publisher")
+#define TXT_LIBRARY_LOADER_HELP     GetLocalString( iFilter, 20060, "Open library loader tool")
 
+#define TXT_REQUESTER_ERROR         GetLocalString( iFilter, 30001, "Can't Open Requester !" )
 
 ////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -513,6 +531,8 @@ int FAR PASCAL PI_Open( PIFilter* iFilter )
     current_filter = iFilter;
     char  tmp[256];
 
+    Data.mLocalFile = TVOpenLocalFile( iFilter, "avalon.loc", 0 );
+
     // Load the .loc file.
     // We don't really cares if it fails here, since we do care in GetLocalString()
 
@@ -538,6 +558,10 @@ int FAR PASCAL PI_Open( PIFilter* iFilter )
 
 void FAR PASCAL PI_Close( PIFilter* iFilter )
 {
+    if( Data.mLocalFile )
+    {
+        TVCloseLocalFile( iFilter, Data.mLocalFile );
+    }
     communication.endpoint.close_connection();
 }
 
@@ -566,7 +590,7 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
             DWORD  req = TVOpenFilterReqEx( iFilter, REQUESTER_W, REQUESTER_H, NULL, NULL, PIRF_STANDARD_REQ, FILTERREQ_NO_TBAR );
             if( req == 0 )
             {
-                TVWarning( iFilter, TXT_ERROR01 );
+                TVWarning( iFilter, TXT_REQUESTER_ERROR );
                 return  0;
             }
             Data.mReq = req;
