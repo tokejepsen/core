@@ -475,9 +475,18 @@ Communicator communication;
 // numbers (like 10011) are IDs in the localized file.
 // strings are the default values to use when the ID is not found
 // in the localized file (or the localized file doesn't exist).
-#define TXT_NAME        "Avalon"
+std::string label_from_evn()
+{
+    std::string _plugin_label = "Avalon";
+    if (std::getenv("AVALON_LABEL") && std::getenv("AVALON_LABEL") != "")
+    {
+        _plugin_label = std::getenv("AVALON_LABEL");
+    }
+    return _plugin_label;
+}
+std::string plugin_label = label_from_evn();
 
-#define TXT_REQUESTER   "Avalon tools"
+#define TXT_REQUESTER   "Tools"
 
 
 #define TXT_ERROR01     "Can't Open Requester !"
@@ -520,7 +529,7 @@ int FAR PASCAL PI_Open( PIFilter* iFilter )
     // Load the .loc file.
     // We don't really cares if it fails here, since we do care in GetLocalString()
 
-    strcpy( iFilter->PIName, TXT_NAME );
+    strcpy( iFilter->PIName, plugin_label.c_str() );
     iFilter->PIVersion = 1;
     iFilter->PIRevision = 1;
 
