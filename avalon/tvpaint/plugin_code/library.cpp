@@ -427,16 +427,16 @@ Communicator communication;
 
 static char* GetLocalString( PIFilter* iFilter, int iNum, char* iDefault )
 {
-char*  str;
+    char*  str;
 
-if( Data.mLocalFile == NULL )
-return  iDefault;
+    if( Data.mLocalFile == NULL )
+        return  iDefault;
 
-str = TVGetLocalString( iFilter, Data.mLocalFile, iNum );
-if( str == NULL  ||  strlen( str ) == 0 )
-return  iDefault;
+    str = TVGetLocalString( iFilter, Data.mLocalFile, iNum );
+    if( str == NULL  ||  strlen( str ) == 0 )
+        return  iDefault;
 
-return  str;
+    return  str;
 }
 
 // sizes of some GUI components
@@ -649,10 +649,7 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
 
 int FAR PASCAL PI_Msg( PIFilter* iFilter, INTPTR iEvent, INTPTR iReq, INTPTR* iArgs )
 {
-    // TODO should be filtered to not execute that all the time
     current_filter = iFilter;
-    communication.process_requests();
-
     // what did happen ?
     switch( iEvent )
     {
@@ -715,6 +712,9 @@ int FAR PASCAL PI_Msg( PIFilter* iFilter, INTPTR iEvent, INTPTR iReq, INTPTR* iA
             // Save it in Aura's init file.
             TVWriteUserString( iFilter, iFilter->PIName, "Open", tmp );
             break;
+
+        case PICBREQ_TICKS:
+            communication.process_requests();
     }
 
     return  1;
