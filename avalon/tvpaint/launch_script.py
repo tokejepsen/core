@@ -43,7 +43,7 @@ def process_in_main_thread(main_thread_item):
     main_thread_item.execute()
 
 
-def avalon_icon_path():
+def get_icon_path():
     """Path to avalon icon image.
 
     Returns:
@@ -67,19 +67,6 @@ def main(launch_args):
     # Create QtApplication for tools
     # - QApplicaiton is also main thread/event loop of the server
     qt_app = QtWidgets.QApplication([])
-    qt_app.setQuitOnLastWindowClosed(False)
-    qt_app.setStyleSheet(style.load_stylesheet())
-
-    # Set application name to be able show application icon in task bar
-    if platform.system().lower() == "windows":
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
-            u"WebsocketServer"
-        )
-    # Load avalon icon
-    icon_path = avalon_icon_path()
-    if icon_path:
-        icon = QtGui.QIcon(icon_path)
-        qt_app.setWindowIcon(icon)
 
     # Execute pipeline installation
     pipeline.install()
@@ -101,6 +88,21 @@ def main(launch_args):
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
+
+    qt_app.setQuitOnLastWindowClosed(False)
+    qt_app.setStyleSheet(style.load_stylesheet())
+
+    # Load avalon icon
+    icon_path = get_icon_path()
+    if icon_path:
+        icon = QtGui.QIcon(icon_path)
+        qt_app.setWindowIcon(icon)
+
+    # Set application name to be able show application icon in task bar
+    if platform.system().lower() == "windows":
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+            u"WebsocketServer"
+        )
 
     # Run Qt application event processing
     sys.exit(qt_app.exec_())
