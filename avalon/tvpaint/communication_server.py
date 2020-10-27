@@ -424,7 +424,7 @@ class Communicator:
             return None
         return self.callback_queue.get()
 
-    def _windows_copy(src_dst_mapping):
+    def _windows_copy(self, src_dst_mapping):
         from win32com.shell import shell
         import pythoncom
 
