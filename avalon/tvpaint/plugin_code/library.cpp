@@ -19,6 +19,7 @@
 #include "json.hpp"
 #include "jsonrpcpp.hpp"
 
+
 // All functions not exported should be static.
 // All global variables should be static.
 
@@ -171,6 +172,8 @@ private:
     client m_endpoint;
     connection_metadata::ptr client_metadata;
     websocketpp::lib::shared_ptr<websocketpp::lib::thread> m_thread;
+    bool thread_is_running = false;
+
 public:
     websocket_endpoint() {
         m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
@@ -182,16 +185,17 @@ public:
     }
 
     void close_connection() {
-        m_endpoint.stop_perpetual();
-
-        client::connection_ptr con = m_endpoint.get_con_from_hdl(client_metadata->get_hdl());
-        // Close client
-        close(websocketpp::close::status::normal, "");
-        // Close Connection
-        // TODO try to find more specific way this is so slow
-        con->close(websocketpp::close::status::normal, "");
-        // Join thread
-        m_thread->join();
+        if (connected())
+        {
+            m_endpoint.stop_perpetual();
+            // Close client
+            close(websocketpp::close::status::normal, "");
+        }
+        if (thread_is_running) {
+            // Join thread
+            m_thread->join();
+            thread_is_running = false;
+        }
     }
 
     bool connected()
@@ -208,6 +212,7 @@ public:
         m_endpoint.start_perpetual();
 
         m_thread.reset(new websocketpp::lib::thread(&client::run, &m_endpoint));
+        thread_is_running = true;
 
         websocketpp::lib::error_code ec;
 
