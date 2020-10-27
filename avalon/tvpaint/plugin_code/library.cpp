@@ -325,7 +325,7 @@ public:
     bool is_connected();
     bool is_usable();
     void connect();
-    void process_requests(PIFilter* iFilter);
+    void process_requests();
     jsonrpcpp::Response call_method(std::string method_name, nlohmann::json params);
     void call_notification(std::string method_name, nlohmann::json params);
 };
@@ -402,10 +402,8 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
     return response;
 }
 
-void Communicator::process_requests(PIFilter* iFilter) {
+void Communicator::process_requests() {
     if (!use_avalon || !connected || messages.empty()) {return;}
-
-    current_filter = iFilter;
 
     while (!messages.empty()) {
         std::string msg = messages.front();
@@ -538,6 +536,7 @@ void FAR PASCAL PI_About( PIFilter* iFilter )
 
 int FAR PASCAL PI_Open( PIFilter* iFilter )
 {
+    current_filter = iFilter;
     char  tmp[256];
 
     // Load the .loc file.
@@ -646,7 +645,8 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
 int FAR PASCAL PI_Msg( PIFilter* iFilter, INTPTR iEvent, INTPTR iReq, INTPTR* iArgs )
 {
     // TODO should be filtered to not execute that all the time
-    communication.process_requests(iFilter);
+    current_filter = iFilter;
+    communication.process_requests();
 
     // what did happen ?
     switch( iEvent )
