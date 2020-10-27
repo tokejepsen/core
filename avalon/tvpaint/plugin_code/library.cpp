@@ -587,7 +587,15 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
             // Also we give 'NULL' as the 'Message Function' for this requester,
             // so all his messages will be sent to PI_Msg.
             // This is an acceptable practice when there are just a few buttons.
-            DWORD  req = TVOpenFilterReqEx( iFilter, REQUESTER_W, REQUESTER_H, NULL, NULL, PIRF_STANDARD_REQ, FILTERREQ_NO_TBAR );
+            DWORD  req = TVOpenFilterReqEx(
+                iFilter,
+                REQUESTER_W,
+                REQUESTER_H,
+                NULL,
+                NULL,
+                PIRF_STANDARD_REQ | PIRF_COLLAPSABLE_REQ,
+                FILTERREQ_NO_TBAR
+            );
             if( req == 0 )
             {
                 TVWarning( iFilter, TXT_REQUESTER_ERROR );
