@@ -31,13 +31,16 @@ static struct
 {DWORD mReq;} Data = {0};
 PIFilter *current_filter;
 
+// Json rpc 2.0 parser - for handling messages and callbacks
 jsonrpcpp::Parser parser;
-
 typedef websocketpp::client<websocketpp::config::asio_client> client;
 
-
+// Id counter for client requests
 int client_request_id = 1;
+// Messages from server before processing.
+// - messages can't be process at the moment of recieve as client is running in thread
 std::queue<std::string> messages;
+// Responses to requests mapped by request id
 std::map<int, jsonrpcpp::Response> responses;
 
 
