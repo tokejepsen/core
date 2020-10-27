@@ -524,14 +524,13 @@ int FAR PASCAL PI_Open( PIFilter* iFilter )
     current_filter = iFilter;
     char  tmp[256];
 
-    Data.mLocalFile = TVOpenLocalFile( iFilter, "avalon.loc", 0 );
-
     // Load the .loc file.
     // We don't really cares if it fails here, since we do care in GetLocalString()
+    Data.mLocalFile = TVOpenLocalFile( iFilter, "avalon.loc", 0 );
 
     strcpy( iFilter->PIName, plugin_label.c_str() );
     iFilter->PIVersion = 1;
-    iFilter->PIRevision = 1;
+    iFilter->PIRevision = 0;
 
     // If this plugin was the one open at Aura shutdown, re-open it
     TVReadUserString( iFilter, iFilter->PIName, "Open", tmp, "0", 255 );
@@ -554,6 +553,10 @@ void FAR PASCAL PI_Close( PIFilter* iFilter )
     if( Data.mLocalFile )
     {
         TVCloseLocalFile( iFilter, Data.mLocalFile );
+    }
+    if( Data.mReq )
+    {
+        TVCloseReq( iFilter, Data.mReq );
     }
     communication.endpoint.close_connection();
 }
