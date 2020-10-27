@@ -33,6 +33,10 @@ from aiohttp_json_rpc.exceptions import RpcError
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
+# Filename of localization file for avalon plugin
+# - localization file may be used to modify labels in plugin
+LOCALIZATION_FILENAME = "avalon.loc"
+
 
 class CommunicatorWrapper:
     # TODO add logs and exceptions
@@ -471,6 +475,10 @@ class Communicator:
             return None
         return self.callback_queue.get()
 
+    def localization_file(self):
+        # TODO: return localization file from config or default.
+        return None
+
     def _windows_copy(self, src_dst_mapping):
         """Windows specific copy process asking for admin permissions.
 
@@ -521,7 +529,7 @@ class Communicator:
         # commit
         fo.PerformOperations()
 
-    def _prepare_windows_plugin(self, launch_args):
+    def _prepare_windows_plugin(self, launch_args, localization_file):
         """Copy plugin to TVPaint plugins and set PATH to dependencies.
 
         Check if plugin in TVPaint's plugins exist and match to plugin
@@ -573,9 +581,22 @@ class Communicator:
         for filename in os.listdir(plugin_dir):
             src_full_path = os.path.join(plugin_dir, filename)
             dst_full_path = os.path.join(host_plugins_path, filename)
-            if os.path.exists(dst_full_path):
-                if not filecmp.cmp(src_full_path, dst_full_path):
-                    to_copy.append((src_full_path, dst_full_path))
+            if (
+                not os.path.exists(dst_full_path)
+                or not filecmp.cmp(src_full_path, dst_full_path)
+            ):
+                to_copy.append((src_full_path, dst_full_path))
+
+        # Add localization file is there is any
+        if localization_file and os.path.exists(localization_file):
+            localization_file_dst = os.path.join(
+                host_plugins_path, LOCALIZATION_FILENAME
+            )
+            if (
+                not os.path.exists(localization_file_dst)
+                or not filecmp.cmp(localization_file, localization_file_dst)
+            ):
+                to_copy.append((localization_file, localization_file_dst))
 
         # Skip copy if everything is done
         if not to_copy:
@@ -597,8 +618,9 @@ class Communicator:
             raise RuntimeError("Copying of plugin was not successfull")
 
     def _launch_tv_paint(self, launch_args):
+        localization_file = self.localization_file()
         if platform.system().lower() == "windows":
-            self._prepare_windows_plugin(launch_args)
+            self._prepare_windows_plugin(launch_args, localization_file)
 
         kwargs = {
             "stdout": subprocess.PIPE,
