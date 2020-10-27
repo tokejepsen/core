@@ -12,12 +12,6 @@ To be able to load plugin, environment variable `WEBSOCKET_URL` must be set othe
 ## Requirements - Python server
 - python >= 3.6
 - aiohttp
-    - async_timeout
-    - chardet
-    - idna
-    - multidict
-    - yarl
-    - typing_extensions
 - aiohttp-json-rpc
 
 ### Windows
