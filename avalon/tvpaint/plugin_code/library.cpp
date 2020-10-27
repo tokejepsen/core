@@ -179,8 +179,12 @@ public:
     void close_connection() {
         m_endpoint.stop_perpetual();
 
+        client::connection_ptr con = m_endpoint.get_con_from_hdl(client_metadata->get_hdl());
+        // Close client
         close(websocketpp::close::status::going_away, "");
-
+        // Close Connection
+        con->close(websocketpp::close::status::going_away, "");
+        // Join thread
         m_thread->join();
     }
 
