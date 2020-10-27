@@ -655,15 +655,36 @@ int FAR PASCAL PI_Msg( PIFilter* iFilter, INTPTR iEvent, INTPTR iReq, INTPTR* iA
         case PICBREQ_BUTTON_UP:
             switch( iArgs[0] )   // iArgs[0] is the ID of the selected button
             {
+                // This call tells Aura to call the following functions in our plugin :
+                // PI_SequenceStart, PI_Start, PI_Work, PI_Finish and PI_SequenceFinish
+                // in the right order.
                 case ID_WORKFILES:
-                    // This call tells Aura to call the following functions in our plugin :
-                    // PI_SequenceStart, PI_Start, PI_Work, PI_Finish and PI_SequenceFinish
-                    // in the right order.
-                    /*
-                    nlohmann::json workfile_method;
-                    workfile_method["method"] = "workfiles_route";
-                    workfile_method["params"] = nlohmann::json::array();*/
-                    communication.call_method("workfiles_route", nlohmann::json::array());
+                    communication.call_method("workfiles_tool", nlohmann::json::array());
+                    TVExecute( iFilter );
+                    break;
+
+                case ID_LOADER:
+                    communication.call_method("loader_tool", nlohmann::json::array());
+                    TVExecute( iFilter );
+                    break;
+
+                case ID_CREATOR:
+                    communication.call_method("creator_tool", nlohmann::json::array());
+                    TVExecute( iFilter );
+                    break;
+
+                case ID_SCENE_INVENTORY:
+                    communication.call_method("scene_inventory_tool", nlohmann::json::array());
+                    TVExecute( iFilter );
+                    break;
+
+                case ID_PUBLISH:
+                    communication.call_method("publish_tool", nlohmann::json::array());
+                    TVExecute( iFilter );
+                    break;
+
+                case ID_LIBRARY_LOADER:
+                    communication.call_method("library_loader_tool", nlohmann::json::array());
                     TVExecute( iFilter );
                     break;
 
