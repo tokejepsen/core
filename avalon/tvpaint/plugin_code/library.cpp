@@ -175,15 +175,6 @@ public:
 };
 
 
-void* websocket_thread(void *x_void_ptr) {
-    client *m_endpoint = (client *)x_void_ptr;
-    m_endpoint->init_asio();
-    m_endpoint->start_perpetual();
-    m_endpoint->run();
-
-    return websocket_thread;
-}
-
 class websocket_endpoint {
 private:
     client m_endpoint;
@@ -220,7 +211,10 @@ public:
     }
 
     int connect(std::string const &uri) {
-        m_thread = websocketpp::lib::make_shared<websocketpp::lib::thread>(&websocket_thread, &m_endpoint);
+        m_endpoint.init_asio();
+        m_endpoint.start_perpetual();
+
+        m_thread.reset(new websocketpp::lib::thread(&client::run, &m_endpoint));
 
         websocketpp::lib::error_code ec;
 
