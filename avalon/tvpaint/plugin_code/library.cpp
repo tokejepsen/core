@@ -379,6 +379,7 @@ void Communicator::process_requests() {
 
     while (!messages.empty()) {
         std::string msg = messages.front();
+        messages.pop();
         std::cout << "Parsing: " << msg << std::endl;
         auto response = parser.parse(msg);
         if (response->is_response()) {
@@ -390,38 +391,30 @@ void Communicator::process_requests() {
             endpoint.send_response(&_response);
         }
 
-        messages.pop();
     }
 }
 
 jsonrpcpp::response_ptr execute_george(const jsonrpcpp::Id &id, const jsonrpcpp::Parameter &params) {
-    nlohmann::json output;
-    try {
-        try {
-            std::string _george_script;
-            const char *george_script;
-            char *_output = "";
-            int result;
+    const char *george_script;
+    char output[1024] = {0};
+    char empty_char = {0};
+    std::string _george_script;
+    std::string _output;
 
-            nlohmann::json json_params = params.to_json();
-            _george_script = json_params[0];
-            george_script = _george_script.c_str();
+    nlohmann::json json_params = params.to_json();
+    _george_script = json_params[0];
+    george_script = _george_script.c_str();
 
-            result = TVSendCmd(current_filter, george_script, _output);
-            if (_output == "") {
-                output = bool(result);
-                return std::make_shared<jsonrpcpp::Response>(id, output);
-            }
-            output = _output;
-            return std::make_shared<jsonrpcpp::Response>(id, output);
-        } catch (const std::exception &e) {
-            output = e.what();
-            return std::make_shared<jsonrpcpp::Response>(id, output);
+    TVSendCmd(current_filter, george_script, output);
+
+    for (int i = 0; i < sizeof(output); i++)
+    {
+        if (output[i] == empty_char){
+            break;
         }
-    } catch (const std::exception& e) {
-        output = "Crashed";
-        return std::make_shared<jsonrpcpp::Response>(id, output);
+        _output += output[i];
     }
+    return std::make_shared<jsonrpcpp::Response>(id, output);
 }
 
 void register_callbacks(){
