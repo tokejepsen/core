@@ -32,7 +32,6 @@ static struct
 PIFilter *current_filter;
 
 jsonrpcpp::Parser parser;
-static pthread_t ws_thread;
 
 typedef websocketpp::client<websocketpp::config::asio_client> client;
 
@@ -189,7 +188,7 @@ class websocket_endpoint {
 private:
     client m_endpoint;
     connection_metadata::ptr client_metadata;
-
+    websocketpp::lib::shared_ptr<websocketpp::lib::thread> m_thread;
 public:
     websocket_endpoint() {
         m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
@@ -213,7 +212,7 @@ public:
                 std::cout << "> Error closing connection: " << ec.message() << std::endl;
             }
         }
-        pthread_join(ws_thread, NULL);
+        m_thread->join();
     }
 
     connection_metadata::ptr get_client_metadata() {
@@ -221,7 +220,7 @@ public:
     }
 
     int connect(std::string const &uri) {
-        int t = pthread_create(&ws_thread, NULL, websocket_thread, &m_endpoint);
+        m_thread = websocketpp::lib::make_shared<websocketpp::lib::thread>(&websocket_thread, &m_endpoint);
 
         websocketpp::lib::error_code ec;
 
@@ -333,7 +332,6 @@ public:
     jsonrpcpp::Response call_method(std::string method_name, nlohmann::json params);
     void call_notification(std::string method_name, nlohmann::json params);
 };
-
 
 Communicator::Communicator() {
     // URL to websocket server
