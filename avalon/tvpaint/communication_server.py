@@ -384,8 +384,44 @@ class MainThreadItem:
         self.args = args
         self.kwargs = kwargs
 
+    def execute(self):
+        """Execute callback and store it's result.
+
+        Method must be called from main thread. Item is marked as `done`
+        when callback execution finished. Store output of callback of exception
+        information when callback raise one.
+        """
+        log.debug("Executing process in main thread")
+        if self.done:
+            log.warning("- item is already processed")
+            return
+
+        callback = self.callback
+        args = self.args
+        kwargs = self.kwargs
+        log.info("Running callback: {}".format(str(callback)))
+        try:
+            result = callback(*args, **kwargs)
+            self.result = result
+
+        except Exception:
+            self.exc_info = sys.exc_info()
+
+        finally:
+            self.done = True
 
     def wait(self):
+        """Wait for result from main thread.
+
+        This method stops current thread until callback is executed.
+
+        Returns:
+            object: Output of callback. May be any type or object.
+
+        Raises:
+            Exception: Reraise any exception that happened during callback
+                execution.
+        """
         while not self.done:
             time.sleep(self.sleep_time)
 

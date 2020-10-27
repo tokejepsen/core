@@ -39,24 +39,8 @@ class MainThreadChecker(QtCore.QThread):
 
 
 def process_in_main_thread(main_thread_item):
-    log.debug("Executing process in main thread")
-    if main_thread_item.done:
-        log.warning("- item is processed")
-        return
-
-    callback = main_thread_item.callback
-    args = main_thread_item.args
-    kwargs = main_thread_item.kwargs
-    log.info("Running callback: {}".format(str(callback)))
-    try:
-        result = callback(*args, **kwargs)
-        main_thread_item.result = result
-
-    except Exception:
-        main_thread_item.exc_info = sys.exc_info()
-
-    finally:
-        main_thread_item.done = True
+    """Execution of `MainThreadItem`."""
+    main_thread_item.execute()
 
 
 def avalon_icon_path():
