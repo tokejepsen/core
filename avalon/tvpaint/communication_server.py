@@ -7,6 +7,7 @@ import asyncio
 import logging
 import socket
 import platform
+import filecmp
 import threading
 from queue import Queue
 from contextlib import closing
@@ -423,6 +424,120 @@ class Communicator:
             return None
         return self.callback_queue.get()
 
+    def _windows_copy(src_dst_mapping):
+        from win32com.shell import shell
+        import pythoncom
+
+        dst_folders = collections.defaultdict(list)
+        for src, dst in src_dst_mapping:
+            src = os.path.normpath(src)
+            dst = os.path.normpath(dst)
+            dst_filename = os.path.basename(dst)
+            dst_folder_path = os.path.dirname(dst)
+            dst_folders[dst_folder_path].append((dst_filename, src))
+
+        # create an instance of IFileOperation
+        fo = pythoncom.CoCreateInstance(
+            shell.CLSID_FileOperation,
+            None,
+            pythoncom.CLSCTX_ALL,
+            shell.IID_IFileOperation
+        )
+
+        # here you can use SetOperationFlags, progress Sinks, etc.
+        for folder_path, items in dst_folders.items():
+            # create an instance of IShellItem for the target folder
+            folder_item = shell.SHCreateItemFromParsingName(
+                folder_path, None, shell.IID_IShellItem
+            )
+            for _dst_filename, source_file_path in items:
+                # create an instance of IShellItem for the source item
+                copy_item = shell.SHCreateItemFromParsingName(
+                    source_file_path, None, shell.IID_IShellItem
+                )
+                # queue the copy operation
+                fo.CopyItem(copy_item, folder_item, _dst_filename, None)
+
+        # commit
+        fo.PerformOperations()
+
+    def _prepare_windows(self, host_executable):
+        executable_file = os.path.basename(host_executable)
+        if "64bit" in executable_file:
+            subfolder = "windows_x64"
+        elif "32bit" in executable_file:
+            subfolder = "windows_x86"
+        else:
+            raise ValueError(
+                "Can't determine if executable "
+                "leads to 32-bit or 64-bit TVPaint!"
+            )
+
+        # Folder for right windows plugin files
+        source_plugins_dir = os.path.join(
+            os.path.dirname(os.path.abspath(tvpaint.__file__)),
+            "plugin_files",
+            subfolder
+        )
+
+        # Path to libraies (.dll) required for plugin library
+        # - additional libraries can be copied to TVPaint installation folder
+        #   (next to executable) or added to PATH environment variable
+        additional_libs_folder = os.path.join(
+            source_plugins_dir,
+            "additional_libraries"
+        )
+        additional_libs_folder = additional_libs_folder.replace("\\", "/")
+        if additional_libs_folder not in os.environ["PATH"]:
+            os.environ["PATH"] += (os.pathsep + additional_libs_folder)
+
+        # Path to TVPaint's plugins folder (where we want to add our plugin)
+        host_plugins_path = os.path.join(
+            os.path.dirname(host_executable),
+            "plugins"
+        )
+
+        # Files that must be copied to TVPaint's plugin folder
+        plugin_dir = os.path.join(source_plugins_dir, "plugin")
+
+        to_copy = []
+        for filename in os.listdir(plugin_dir):
+            src_full_path = os.path.join(plugin_dir, filename)
+            dst_full_path = os.path.join(host_plugins_path, filename)
+            if os.path.exists(dst_full_path):
+                if not filecmp.cmp(src_full_path, dst_full_path):
+                    to_copy.append((src_full_path, dst_full_path))
+
+        # Skip copy if everything is done
+        if not to_copy:
+            return
+
+        # Try to copy
+        try:
+            self._windows_copy(to_copy)
+        except Exception:
+            pass
+
+        # Validate copy was done
+        invalid = []
+        for src, dst in to_copy:
+            if not os.path.exists(dst) or not filecmp.cmp(src, dst):
+                invalid.append((src, dst))
+
+        if invalid:
+            raise RuntimeError("Copying of plugin was not successfull")
+
+    def _launch_tv_paint(self, host_executable):
+        if platform.system().lower() == "windows":
+            self._prepare_windows(host_executable)
+
+        kwargs = {
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "env": os.environ
+        }
+        self.process = subprocess.Popen(host_executable, **kwargs)
+
     def launch(self, host_executable):
         log.info("Installing TVPaint implementation")
         api.install(tvpaint)
@@ -448,12 +563,7 @@ class Communicator:
             time.sleep(0.1)
 
         # Start TVPaint when server is running
-        kwargs = {
-            "stdout": subprocess.PIPE,
-            "stderr": subprocess.PIPE,
-            "env": os.environ
-        }
-        self.process = subprocess.Popen(host_executable, **kwargs)
+        self._launch_tv_paint(host_executable)
 
         log.info("Waiting for client connection")
         while True:
