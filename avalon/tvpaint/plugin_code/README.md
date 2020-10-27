@@ -7,6 +7,8 @@ This implementaiton is using TVPaint plugin (C/C++) which can communicate with p
 
 Current implementation is based on websocket protocol, using json-rpc communication (specification 2.0). Project is in beta stage, tested only on Windows.
 
+To be able to load plugin, environment variable `WEBSOCKET_URL` must be set otherwise plugin won't load at all. Plugin should not affect TVPaint if python server crash, but buttons won't work.
+
 ## Requirements - Python server
 - python >= 3.6
 - aiohttp
@@ -32,6 +34,10 @@ Current implementation is based on websocket protocol, using json-rpc communicat
 ### jsonrpcpp
 This library has `nlohmann/json` as it's part, but current `master` has old version which has bug and probably won't be possible to use library on windows without using last `nlohmann/json`.
 
+## Plugin localization
+TVPaint plugins allow to have localization files. This gave ability to modify labels in the plugin. Localization file must have filename `avalon.loc` and must located in TVPaint's plugins dir next to the plugin. See example in `~/avalon/tvpaint/plugin_code/avalon.loc`. For label of plugin in plugins list is used environemnt variable `"AVALON_LABEL"`. `"Avalon"` label is used as default if variable is not set.
+
 ## TODO
 - modify code and CMake to be able to compile on MacOS/Linux
 - separate websocket logic from plugin logic
+- hide buttons and show error message if server is closed
