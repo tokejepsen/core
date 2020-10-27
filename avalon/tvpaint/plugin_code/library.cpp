@@ -694,8 +694,10 @@ int FAR PASCAL PI_Msg( PIFilter* iFilter, INTPTR iEvent, INTPTR iReq, INTPTR* iA
 
         // The requester was just closed.
         case PICBREQ_CLOSE:
-            char  tmp[256];
+            // requester doesn't exists anymore
+            Data.mReq = 0;
 
+            char  tmp[256];
             // Save the requester state (opened or closed)
             // iArgs[4] contains a flag which tells us if the requester
             // has been closed by the user (flag=0) or by Aura's shutdown (flag=1).
