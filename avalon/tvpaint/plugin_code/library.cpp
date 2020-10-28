@@ -101,7 +101,6 @@ public:
     void process_message(std::string msg) {
         std::cout << "--> " << msg << "\n";
         try {
-            // Make sure message has jsonrpc key (as Python's module `wsrpc_aiohttp` does not send it)
             jsonrpcpp::entity_ptr entity = parser.do_parse(msg);
             if (!entity) {
                 // Return error code?
@@ -136,6 +135,9 @@ public:
     }
 
     void send(std::string message) {
+        if (get_status() != "Open") {
+            return;
+        }
         websocketpp::lib::error_code ec;
 
         m_endpoint->send(m_hdl, message, websocketpp::frame::opcode::text, ec);
@@ -185,9 +187,9 @@ public:
     }
 
     void close_connection() {
+        m_endpoint.stop_perpetual();
         if (connected())
         {
-            m_endpoint.stop_perpetual();
             // Close client
             close(websocketpp::close::status::normal, "");
         }
