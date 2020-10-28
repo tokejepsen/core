@@ -9,8 +9,8 @@ import logging
 
 import avalon
 from avalon import style
-from avalon.tvpaint import pipeline
 from avalon.tvpaint.communication_server import CommunicatorWrapper
+from avalon import tvpaint, api
 from avalon.vendor.Qt import QtWidgets, QtCore, QtGui
 
 log = logging.getLogger(__name__)
@@ -69,7 +69,7 @@ def main(launch_args):
     qt_app = QtWidgets.QApplication([])
 
     # Execute pipeline installation
-    pipeline.install()
+    api.install(tvpaint)
 
     # Create Communicator object and trigger launch
     # - this must be done before anything is processed
