@@ -1,15 +1,17 @@
+#ifdef _WIN32
+// Include <winsock2.h> before <windows.h>
 #include <winsock2.h>
+#endif
+
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <cstring>
-#include <fstream>
 #include <map>
 #include <string>
 #include <queue>
 
 #include "plugdllx.h"
-#include "plugx.h"
 
 #include <boost/chrono.hpp>
 
