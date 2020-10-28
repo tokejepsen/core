@@ -1,3 +1,4 @@
+from .communication_server import CommunicatorWrapper
 from . import launch_script
 from .pipeline import (
     install,
@@ -15,6 +16,7 @@ from .workio import (
 )
 
 __all__ = (
+    "CommunicatorWrapper",
     "launch_script",
 
     "install",
