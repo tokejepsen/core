@@ -408,6 +408,8 @@ class TVPaintRpc(JsonRpc):
                 raise Exception("Timeout passed")
                 return
 
+            time.sleep(0.1)
+
         if response is not_found:
             raise Exception("Connection closed")
 
