@@ -27,24 +27,24 @@
 static struct {
     DWORD mReq;
     void* mLocalFile;
+    PIFilter *current_filter;
+    // Id counter for client requests
+    int client_request_id;
+    // Messages from server before processing.
+    // - messages can't be process at the moment of recieve as client is running in thread
+    std::queue<std::string> messages;
+    // Responses to requests mapped by request id
+    std::map<int, jsonrpcpp::Response> responses;
 } Data = {
     0,
-    NULL
+    NULL,
+    NULL,
+    1
 };
-
-PIFilter *current_filter;
 
 // Json rpc 2.0 parser - for handling messages and callbacks
 jsonrpcpp::Parser parser;
 typedef websocketpp::client<websocketpp::config::asio_client> client;
-
-// Id counter for client requests
-int client_request_id = 1;
-// Messages from server before processing.
-// - messages can't be process at the moment of recieve as client is running in thread
-std::queue<std::string> messages;
-// Responses to requests mapped by request id
-std::map<int, jsonrpcpp::Response> responses;
 
 
 class connection_metadata {
@@ -108,10 +108,10 @@ public:
 
             } else if (entity->is_response()) {
                 jsonrpcpp::Response response = jsonrpcpp::Response(entity->to_json());
-                responses[response.id().int_id()] = response;
+                Data.responses[response.id().int_id()] = response;
 
             } else if (entity->is_request() || entity->is_notification()) {
-                messages.push(msg);
+                Data.messages.push(msg);
             }
         }
         catch (const jsonrpcpp::RequestException &e) {
@@ -361,14 +361,14 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
     {
         return response;
     }
-    int request_id = client_request_id++;
+    int request_id = Data.client_request_id++;
     jsonrpcpp::Request request = {request_id, method_name, params};
     endpoint.send_request(&request);
 
     bool found = false;
     while (!found) {
-        std::map<int, jsonrpcpp::Response>::iterator iter = responses.find(request_id);
-        if (iter != responses.end()) {
+        std::map<int, jsonrpcpp::Response>::iterator iter = Data.responses.find(request_id);
+        if (iter != Data.responses.end()) {
             //element found == was found response
             response = iter->second;
             found = true;
@@ -382,9 +382,9 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
 void Communicator::process_requests() {
     if (!use_avalon || !is_connected() || messages.empty()) {return;}
 
-    while (!messages.empty()) {
-        std::string msg = messages.front();
-        messages.pop();
+    while (!Data.messages.empty()) {
+        std::string msg = Data.messages.front();
+        Data.messages.pop();
         std::cout << "Parsing: " << msg << std::endl;
         auto response = parser.parse(msg);
         if (response->is_response()) {
@@ -395,7 +395,6 @@ void Communicator::process_requests() {
             jsonrpcpp::Response _response(request->id(), error);
             endpoint.send_response(&_response);
         }
-
     }
 }
 
@@ -410,7 +409,7 @@ jsonrpcpp::response_ptr execute_george(const jsonrpcpp::Id &id, const jsonrpcpp:
     _george_script = json_params[0];
     george_script = _george_script.c_str();
 
-    TVSendCmd(current_filter, george_script, output);
+    TVSendCmd(Data.current_filter, george_script, output);
 
     for (int i = 0; i < sizeof(output); i++)
     {
@@ -526,7 +525,7 @@ void FAR PASCAL PI_About( PIFilter* iFilter )
 
 int FAR PASCAL PI_Open( PIFilter* iFilter )
 {
-    current_filter = iFilter;
+    Data.current_filter = iFilter;
     char  tmp[256];
 
     // Load the .loc file.
@@ -654,7 +653,7 @@ int FAR PASCAL PI_Parameters( PIFilter* iFilter, char* iArg )
 
 int FAR PASCAL PI_Msg( PIFilter* iFilter, INTPTR iEvent, INTPTR iReq, INTPTR* iArgs )
 {
-    current_filter = iFilter;
+    Data.current_filter = iFilter;
     // what did happen ?
     switch( iEvent )
     {
