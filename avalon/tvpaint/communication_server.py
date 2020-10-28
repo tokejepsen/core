@@ -9,6 +9,7 @@ import logging
 import socket
 import platform
 import filecmp
+import tempfile
 import threading
 from queue import Queue
 from contextlib import closing
@@ -93,6 +94,31 @@ class CommunicatorWrapper:
         return CommunicatorWrapper.send_request(
             "execute_george", [george_script]
         )
+
+    @classmethod
+    def execute_george_through_file(cls, george_script):
+        """Execute george script with temp file.
+
+        Allows to execute multiline george script without stopping websocket
+        client.
+
+        On windows make sure script does not contain paths with backwards
+        slashes in paths, TVPaint won't execute properly in that case.
+
+        Args:
+            george_script (str): George script to execute. May be multilined.
+        """
+        temporary_file = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".grg", delete=False
+        )
+        temporary_file.write(george_script)
+        temporary_file.close()
+        CommunicatorWrapper.execute_george(
+            "tv_runscript {}".format(
+                temporary_file.name.replace("\\", "/")
+            )
+        )
+        os.remove(temporary_file.name)
 
     @classmethod
     def send_notification(cls, method, params=[], client=None):
