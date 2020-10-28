@@ -37,8 +37,8 @@ static struct {
     std::map<int, jsonrpcpp::Response> responses;
 } Data = {
     0,
-    NULL,
-    NULL,
+    nullptr,
+    nullptr,
     1
 };
 
