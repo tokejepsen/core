@@ -52,40 +52,24 @@ private:
     websocketpp::connection_hdl m_hdl;
     client *m_endpoint;
     std::string m_status;
-    std::string m_uri;
-    std::string m_server;
-    std::string m_error_reason;
 public:
     typedef websocketpp::lib::shared_ptr<connection_metadata> ptr;
 
-    connection_metadata(websocketpp::connection_hdl hdl, std::string uri, client *endpoint)
-            : m_hdl(hdl), m_status("Connecting"), m_uri(uri), m_server("N/A") {
+    connection_metadata(websocketpp::connection_hdl hdl, client *endpoint)
+            : m_hdl(hdl), m_status("Connecting") {
         m_endpoint = endpoint;
     }
 
     void on_open(client *c, websocketpp::connection_hdl hdl) {
         m_status = "Open";
-
-        client::connection_ptr con = c->get_con_from_hdl(hdl);
-        m_server = con->get_response_header("Server");
     }
 
     void on_fail(client *c, websocketpp::connection_hdl hdl) {
         m_status = "Failed";
-
-        client::connection_ptr con = c->get_con_from_hdl(hdl);
-        m_server = con->get_response_header("Server");
-        m_error_reason = con->get_ec().message();
     }
 
     void on_close(client *c, websocketpp::connection_hdl hdl) {
         m_status = "Closed";
-        client::connection_ptr con = c->get_con_from_hdl(hdl);
-        std::stringstream s;
-        s << "close code: " << con->get_remote_close_code() << " ("
-          << websocketpp::close::status::get_string(con->get_remote_close_code())
-          << "), close reason: " << con->get_remote_close_reason();
-        m_error_reason = s.str();
     }
 
     void on_message(websocketpp::connection_hdl, client::message_ptr msg) {
@@ -225,7 +209,7 @@ public:
             return -1;
         }
 
-        client_metadata = websocketpp::lib::make_shared<connection_metadata>(con->get_handle(), uri, &m_endpoint);
+        client_metadata = websocketpp::lib::make_shared<connection_metadata>(con->get_handle(), &m_endpoint);
 
         con->set_open_handler(websocketpp::lib::bind(
                 &connection_metadata::on_open,
