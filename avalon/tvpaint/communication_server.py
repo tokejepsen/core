@@ -274,8 +274,8 @@ class TVPaintRpc(JsonRpc):
     async def _handle_rpc_msg(self, http_request, raw_msg):
         # This is duplicated code from super but there is no way how to do it
         # to be able handle server->client requests
-        remote = http_request.remote
-        if remote in self.waiting_requests:
+        host = http_request.host
+        if host in self.waiting_requests:
             try:
                 _raw_message = raw_msg.data
                 msg = decode_msg(_raw_message)
@@ -286,8 +286,8 @@ class TVPaintRpc(JsonRpc):
 
             if msg.type in (JsonRpcMsgTyp.RESULT, JsonRpcMsgTyp.ERROR):
                 msg_data = json.loads(_raw_message)
-                if msg_data.get("id") in self.waiting_requests[remote]:
-                    self.responses[remote].append(msg_data)
+                if msg_data.get("id") in self.waiting_requests[host]:
+                    self.responses[host].append(msg_data)
                     return
 
         return await super()._handle_rpc_msg(http_request, raw_msg)
@@ -346,15 +346,15 @@ class TVPaintRpc(JsonRpc):
         result = future.result()
 
     def send_request(self, client, method, params=[], timeout=0):
-        client_remote = client.remote
+        client_host = client.host
 
-        request_id = self.requests_ids[client_remote]
-        self.requests_ids[client_remote] += 1
+        request_id = self.requests_ids[client_host]
+        self.requests_ids[client_host] += 1
 
-        self.waiting_requests[client_remote].append(request_id)
+        self.waiting_requests[client_host].append(request_id)
 
         log.debug("Sending request to client {} ({}, {}) id: {}".format(
-            client_remote, method, params, request_id
+            client_host, method, params, request_id
         ))
         future = asyncio.run_coroutine_threadsafe(
             client.ws.send_str(encode_request(method, request_id, params)),
@@ -369,7 +369,7 @@ class TVPaintRpc(JsonRpc):
             if client.ws.closed:
                 return None
 
-            for _response in self.responses[client_remote]:
+            for _response in self.responses[client_host]:
                 _id = _response.get("id")
                 if _id == request_id:
                     response = _response
@@ -384,6 +384,8 @@ class TVPaintRpc(JsonRpc):
 
         if response is not_found:
             raise Exception("Connection closed")
+
+        self.responses[client_host].remove(response)
 
         error = response.get("error")
         result = response.get("result")
