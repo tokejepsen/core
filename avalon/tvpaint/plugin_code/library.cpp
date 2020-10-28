@@ -366,7 +366,7 @@ jsonrpcpp::Response Communicator::call_method(std::string method_name, nlohmann:
 }
 
 void Communicator::process_requests() {
-    if (!use_avalon || !is_connected() || messages.empty()) {return;}
+    if (!use_avalon || !is_connected() || Data.messages.empty()) {return;}
 
     while (!Data.messages.empty()) {
         std::string msg = Data.messages.front();
