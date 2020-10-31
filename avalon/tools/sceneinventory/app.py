@@ -748,6 +748,15 @@ class SwitchAssetDialog(QtWidgets.QDialog):
 
         self.setMinimumWidth(self.MIN_WIDTH)
 
+        # Set initial asset as current.
+        index = self._assets_box.findText(
+            api.Session["AVALON_ASSET"], QtCore.Qt.MatchFixedString
+        )
+        print("asset box index", index)
+        if index >= 0:
+            print("setting asset box")
+            self._assets_box.setCurrentIndex(index)
+
         # Set default focus to accept button so you don't directly type in
         # first asset field, this also allows to see the placeholder value.
         accept_btn.setFocus()
